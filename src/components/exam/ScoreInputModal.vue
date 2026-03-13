@@ -1,0 +1,317 @@
+<template>
+  <div v-if="visible" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>채점 결과 입력</h3>
+        <p>응시 정보와 분야별 점수를 입력하세요 (0~20)</p>
+      </div>
+
+      <!-- 메타데이터 입력 -->
+      <div class="meta-section">
+        <div class="meta-row">
+          <label class="meta-label">응시 년도</label>
+          <div class="meta-options">
+            <button
+              v-for="y in YEARS"
+              :key="y"
+              :class="['meta-btn', { active: selectedYear === y }]"
+              @click="selectedYear = y"
+            >{{ y }}</button>
+          </div>
+        </div>
+
+        <div class="meta-row">
+          <label class="meta-label">시험 시기</label>
+          <div class="meta-options">
+            <button
+              v-for="p in PERIODS"
+              :key="p"
+              :class="['meta-btn', { active: selectedPeriod === p }]"
+              @click="selectedPeriod = p"
+            >{{ p }}</button>
+          </div>
+        </div>
+
+        <div class="meta-row">
+          <label class="meta-label">플랫폼</label>
+          <div class="meta-options platform-options">
+            <button
+              v-for="pl in PLATFORMS"
+              :key="pl"
+              :class="['meta-btn', { active: selectedPlatform === pl }]"
+              @click="selectedPlatform = pl"
+            >{{ pl }}</button>
+            <input
+              v-if="selectedPlatform === '기타'"
+              v-model="customPlatform"
+              class="platform-input"
+              placeholder="직접 입력"
+            />
+          </div>
+        </div>
+
+        <div class="meta-row">
+          <label class="meta-label">회차</label>
+          <div class="meta-options">
+            <button
+              v-for="r in ROUNDS"
+              :key="r"
+              :class="['meta-btn', { active: selectedRound === r }]"
+              @click="selectedRound = selectedRound === r ? null : r"
+            >{{ r }}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider-line" />
+
+      <div class="score-fields">
+        <div v-for="cat in CATEGORIES" :key="cat" class="score-row">
+          <label class="cat-label">{{ cat }}</label>
+          <div class="score-input-wrap">
+            <input
+              type="number"
+              min="0"
+              max="20"
+              v-model.number="scores[cat]"
+              class="score-input"
+              placeholder="0"
+            />
+            <span class="unit">점</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="total-row">
+        <span class="total-label">총점</span>
+        <span class="total-value">{{ totalScore }}점</span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" @click="$emit('close')">취소</button>
+        <button class="btn-submit" @click="handleSubmit" :disabled="submitting">
+          {{ submitting ? '저장 중...' : '제출하기' }}
+        </button>
+      </div>
+
+      <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue'
+import { useResultStore } from '@/stores/result'
+import { useAuthStore } from '@/stores/auth'
+
+const props = defineProps({
+  visible: Boolean,
+  sessionId: { type: [String, Number], default: null }
+})
+const emit = defineEmits(['close', 'saved'])
+
+const resultStore = useResultStore()
+const authStore = useAuthStore()
+
+const CATEGORIES = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
+const YEARS = [2023, 2024, 2025, 2026]
+const PERIODS = ['상반기', '하반기']
+const PLATFORMS = ['해커스', '링커리어', '인크루트', '에듀윌', '기타']
+const ROUNDS = ['1회', '2회', '3회', '4회', '5회']
+
+const scores = ref(Object.fromEntries(CATEGORIES.map(c => [c, null])))
+const selectedYear = ref(new Date().getFullYear())
+const selectedPeriod = ref('상반기')
+const selectedPlatform = ref('해커스')
+const customPlatform = ref('')
+const selectedRound = ref(null)
+const submitting = ref(false)
+const errorMsg = ref('')
+
+const totalScore = computed(() => {
+  const vals = CATEGORIES.map(c => scores.value[c]).filter(v => v !== null && v !== '')
+  if (vals.length === 0) return 0
+  return vals.reduce((a, b) => a + b, 0)
+})
+
+const effectivePlatform = computed(() =>
+  selectedPlatform.value === '기타' ? (customPlatform.value || '기타') : selectedPlatform.value
+)
+
+async function handleSubmit() {
+  errorMsg.value = ''
+  const filled = CATEGORIES.filter(c => scores.value[c] !== null && scores.value[c] !== '')
+  if (filled.length < CATEGORIES.length) {
+    errorMsg.value = '모든 분야의 점수를 입력해주세요.'
+    return
+  }
+  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
+  if (invalid) {
+    errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
+    return
+  }
+
+  if (!authStore.isLoggedIn) {
+    emit('saved', { ...scores.value })
+    return
+  }
+
+  submitting.value = true
+  const result = await resultStore.saveManualResult(props.sessionId, scores.value, {
+    examYear: selectedYear.value,
+    examPeriod: selectedPeriod.value,
+    platform: effectivePlatform.value,
+    examRound: selectedRound.value
+  })
+  submitting.value = false
+
+  if (result.success) {
+    emit('saved', result.resultId)
+  } else {
+    errorMsg.value = '저장에 실패했습니다. 다시 시도해주세요.'
+  }
+}
+</script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.modal-header { margin-bottom: 20px; }
+.modal-header h3 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.modal-header p { font-size: 13px; color: #6b7280; }
+
+.meta-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+
+.meta-row { display: flex; align-items: flex-start; gap: 12px; }
+.meta-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  min-width: 64px;
+  padding-top: 6px;
+}
+
+.meta-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.platform-options { align-items: center; }
+
+.meta-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.meta-btn:hover { background: #e5e7eb; }
+.meta-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+.platform-input {
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  width: 90px;
+}
+.platform-input:focus { border-color: #4f46e5; }
+
+.divider-line {
+  border-top: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.score-fields { display: flex; flex-direction: column; gap: 12px; }
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cat-label { font-size: 14px; font-weight: 500; color: #374151; }
+
+.score-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-input {
+  width: 72px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.score-input:focus { border-color: #4f46e5; }
+
+.unit { font-size: 13px; color: #6b7280; }
+
+.total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+.total-label { font-size: 14px; font-weight: 600; color: #374151; }
+.total-value { font-size: 20px; font-weight: 700; color: #1f2937; }
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+.modal-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-cancel { background: #f3f4f6; color: #374151; }
+.btn-cancel:hover { background: #e5e7eb; }
+.btn-submit { background: #4f46e5; color: #fff; }
+.btn-submit:hover:not(:disabled) { background: #4338ca; }
+.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.error-msg {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #ef4444;
+  text-align: center;
+}
+</style>
