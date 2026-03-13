@@ -65,6 +65,7 @@
           @timer-start="timerRunning = true"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
+          @timer-zero="handleTimerZero"
         />
       </div>
     </div>
@@ -210,6 +211,15 @@ function handleTimeLimitUpdate(minutes) {
 function handleTimerReset() {
   timerRunning.value = false
   remainingSeconds.value = totalSeconds.value
+  timerKey.value++
+  warned5min = false
+  warned1min = false
+}
+
+function handleTimerZero() {
+  timerRunning.value = false
+  totalSeconds.value = 0
+  remainingSeconds.value = 0
   timerKey.value++
   warned5min = false
   warned1min = false

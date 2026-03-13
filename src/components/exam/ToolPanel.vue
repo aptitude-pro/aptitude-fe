@@ -19,6 +19,7 @@
           {{ timerRunning ? '정지' : '시작' }}
         </button>
         <button class="timer-btn reset" @click="resetTimer">리셋</button>
+        <button class="timer-btn zero" @click="zeroTimer">0</button>
       </div>
     </div>
 
@@ -68,7 +69,7 @@ const props = defineProps({
   remaining: { type: Number, default: 0 },
   timerRunning: { type: Boolean, default: false }
 })
-const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset'])
+const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset', 'timer-zero'])
 
 const activeTab = ref('memo')
 const drawRef = ref(null)
@@ -107,6 +108,10 @@ function toggleTimer() {
 
 function resetTimer() {
   emit('timer-reset')
+}
+
+function zeroTimer() {
+  emit('timer-zero')
 }
 
 function clearMemo() {
@@ -189,6 +194,7 @@ onMounted(() => {
 .timer-btn.start { background: #10b981; color: #fff; }
 .timer-btn.stop { background: #ef4444; color: #fff; }
 .timer-btn.reset { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+.timer-btn.zero { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
 
 .tool-tabs {
   display: flex;
