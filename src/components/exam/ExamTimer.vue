@@ -19,6 +19,11 @@ const emit = defineEmits(['tick', 'expired'])
 const remaining = ref(props.totalSeconds)
 let interval = null
 
+// totalSeconds가 변경되면 (리셋 등) remaining도 동기화
+watch(() => props.totalSeconds, (v) => {
+  if (!props.running) remaining.value = v
+})
+
 watch(() => props.running, (val) => {
   if (val) {
     interval = setInterval(() => {

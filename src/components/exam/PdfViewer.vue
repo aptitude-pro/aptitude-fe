@@ -51,9 +51,9 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
-import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
+// public/pdf.worker.min.js 로 서빙 (.js 확장자 → nginx가 application/javascript로 처리)
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
 const containerRef = ref(null)
 const pagesContainerRef = ref(null)
@@ -69,21 +69,28 @@ async function loadPdf(event) {
   const file = event.target.files[0]
   if (!file) return
 
-  const arrayBuffer = await file.arrayBuffer()
-  pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-  totalPages.value = pdfDoc.numPages
-  pdfLoaded.value = true
-  await nextTick()
-  if (viewMode.value === 'scroll') {
-    renderAllPages()
-  } else {
-    currentPage.value = 1
-    renderSinglePage(1)
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    totalPages.value = pdfDoc.numPages
+    pdfLoaded.value = true
+    await nextTick()
+    if (viewMode.value === 'scroll') {
+      await renderAllPages()
+    } else {
+      currentPage.value = 1
+      await renderSinglePage(1)
+    }
+  } catch (err) {
+    console.error('PDF 로드 실패:', err)
+    alert('PDF 파일을 불러오지 못했습니다. 파일이 올바른지 확인해주세요.')
   }
 }
 
 async function renderAllPages() {
-  if (!pdfDoc || !pagesContainerRef.value) return
+  if (!pdfDoc) return
+  if (!pagesContainerRef.value) await nextTick()
+  if (!pagesContainerRef.value) return
   const myGen = ++renderGeneration
   const container = pagesContainerRef.value
   container.innerHTML = ''
@@ -116,7 +123,9 @@ async function renderAllPages() {
 }
 
 async function renderSinglePage(pageNum) {
-  if (!pdfDoc || !pagesContainerRef.value) return
+  if (!pdfDoc) return
+  if (!pagesContainerRef.value) await nextTick()
+  if (!pagesContainerRef.value) return
   const myGen = ++renderGeneration
   const container = pagesContainerRef.value
   container.innerHTML = ''

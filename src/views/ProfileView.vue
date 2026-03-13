@@ -67,7 +67,7 @@
       </div>
 
       <!-- 알림 설정 -->
-      <div class="card">
+      <div class="card" id="settings-card">
         <h3>알림 설정</h3>
         <div class="setting-list">
           <div class="setting-item">
@@ -111,13 +111,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import apiClient from '@/api'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const updateLoading = ref(false)
 const updateMsg = ref('')
@@ -134,10 +135,30 @@ const profileForm = ref({
 
 const pwForm = ref({ current: '', newPw: '', confirm: '' })
 
-const settings = ref({
-  timer5min: true,
-  timer1min: true,
-  darkMode: false
+// 알림/다크모드 설정 불러오기
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('notificationSettings')
+    if (saved) return JSON.parse(saved)
+  } catch (_) {}
+  return { timer5min: true, timer1min: true, darkMode: false }
+}
+
+const settings = ref(loadSettings())
+
+// 설정 변경 시 자동 저장
+watch(settings, (val) => {
+  localStorage.setItem('notificationSettings', JSON.stringify(val))
+}, { deep: true })
+
+onMounted(() => {
+  // tab=settings 쿼리가 있으면 알림 설정 카드로 스크롤
+  if (route.query.tab === 'settings') {
+    setTimeout(() => {
+      const el = document.getElementById('settings-card')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+  }
 })
 
 async function handleUpdateProfile() {
@@ -182,6 +203,7 @@ async function handleChangePassword() {
 
 function toggleDark() {
   document.documentElement.setAttribute('data-theme', settings.value.darkMode ? 'dark' : '')
+  localStorage.setItem('notificationSettings', JSON.stringify(settings.value))
 }
 
 async function confirmDelete() {

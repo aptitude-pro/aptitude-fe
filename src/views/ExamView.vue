@@ -25,6 +25,9 @@
       </div>
     </header>
 
+    <!-- 타이머 경고 배너 -->
+    <div v-if="timerWarning" class="timer-warning-banner">{{ timerWarning }}</div>
+
     <!-- 본문 3열 -->
     <div class="exam-body" ref="bodyRef">
       <!-- 좌: PDF 뷰어 -->
@@ -143,6 +146,19 @@ let startX = 0
 let startWidths = []
 let saveTimer = null
 
+// 알림 설정 읽기
+const notifSettings = (() => {
+  try {
+    const s = localStorage.getItem('notificationSettings')
+    return s ? JSON.parse(s) : { timer5min: true, timer1min: true }
+  } catch (_) { return { timer5min: true, timer1min: true } }
+})()
+
+// 타이머 경고 상태
+const timerWarning = ref('')
+let warned5min = false
+let warned1min = false
+
 const answeredCount = computed(() => Object.keys(examStore.answers).length)
 const unansweredCount = computed(() => questionCount - answeredCount.value)
 
@@ -171,6 +187,17 @@ onUnmounted(() => {
 
 function onTick(remaining) {
   remainingSeconds.value = remaining
+
+  if (notifSettings.timer5min && remaining === 300 && !warned5min) {
+    warned5min = true
+    timerWarning.value = '⚠️ 시험 종료 5분 전입니다!'
+    setTimeout(() => { timerWarning.value = '' }, 8000)
+  }
+  if (notifSettings.timer1min && remaining === 60 && !warned1min) {
+    warned1min = true
+    timerWarning.value = '🚨 시험 종료 1분 전입니다!'
+    setTimeout(() => { timerWarning.value = '' }, 8000)
+  }
 }
 
 function handleTimeLimitUpdate(minutes) {
@@ -184,6 +211,8 @@ function handleTimerReset() {
   timerRunning.value = false
   remainingSeconds.value = totalSeconds.value
   timerKey.value++
+  warned5min = false
+  warned1min = false
 }
 
 async function onTimeExpired() {
@@ -337,6 +366,23 @@ function stopDrag() {
 }
 .btn-submit-exam:hover { background: #4338ca; }
 
+.timer-warning-banner {
+  background: #fef3c7;
+  color: #92400e;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border-bottom: 1px solid #fde68a;
+  animation: fadeInOut 0.3s ease;
+}
+
+@keyframes fadeInOut {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .exam-body {
   flex: 1;
   display: flex;
@@ -347,6 +393,11 @@ function stopDrag() {
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
+}
+
+.panel-omr {
+  display: flex;
+  justify-content: center;
 }
 
 .divider {

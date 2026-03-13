@@ -74,7 +74,7 @@ const activeTab = ref('memo')
 const drawRef = ref(null)
 
 // 15분 단위 시간 선택
-const timeOptions = [15, 30, 45, 60, 75, 90, 105, 120, 150, 180]
+const timeOptions = [0, 15, 30, 45, 60, 75, 90, 105, 120, 150, 180]
 const localMinutes = ref(60)
 
 // 타이머 표시: 시작 후엔 remaining prop, 그 전엔 선택된 시간
