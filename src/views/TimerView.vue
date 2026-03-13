@@ -130,7 +130,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import DrawingBoard from '@/components/exam/DrawingBoard.vue'
 import Calculator from '@/components/exam/Calculator.vue'
 
-const PRESETS = [15, 30, 45, 60, 75, 90]
+const PRESETS = [0, 15, 30, 45, 60, 75, 90]
 
 // 모드 전환 (타이머 / 스톱워치)
 const mode = ref('timer')

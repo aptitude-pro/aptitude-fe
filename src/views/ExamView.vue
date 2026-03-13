@@ -65,7 +65,6 @@
           @timer-start="timerRunning = true"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
-          @timer-zero="handleTimerZero"
         />
       </div>
     </div>
@@ -216,14 +215,6 @@ function handleTimerReset() {
   warned1min = false
 }
 
-function handleTimerZero() {
-  timerRunning.value = false
-  totalSeconds.value = 0
-  remainingSeconds.value = 0
-  timerKey.value++
-  warned5min = false
-  warned1min = false
-}
 
 async function onTimeExpired() {
   timerRunning.value = false
