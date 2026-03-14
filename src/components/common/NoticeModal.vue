@@ -2,39 +2,11 @@
   <div class="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-icon">👋</span>
-        <h2>AptitudePro 사용 안내</h2>
+        <h2>AptitudePro 사용 가이드</h2>
       </div>
 
-      <div class="notice-content">
-        <div class="notice-item">
-          <span class="notice-num">01</span>
-          <div>
-            <strong>시험 유형 선택</strong>
-            <p>SKCT, GSAT, NCS, CJ 등 목표 기업의 시험 유형을 선택하고 모의고사를 시작할 수 있습니다.</p>
-          </div>
-        </div>
-        <div class="notice-item">
-          <span class="notice-num">02</span>
-          <div>
-            <strong>대시보드에서 실력 확인</strong>
-            <p>응시 기록, 영역별 정확도, 성장 추이를 그래프로 한눈에 확인할 수 있습니다.</p>
-          </div>
-        </div>
-        <div class="notice-item">
-          <span class="notice-num">03</span>
-          <div>
-            <strong>학습 기록 관리</strong>
-            <p>오답 노트와 학습 히스토리를 통해 부족한 부분을 집중적으로 복습하세요.</p>
-          </div>
-        </div>
-        <div class="notice-item">
-          <span class="notice-num">04</span>
-          <div>
-            <strong>타이머 & 집중 모드</strong>
-            <p>실전처럼 시간 제한을 두고 풀거나, 학습 타이머로 집중력을 관리할 수 있습니다.</p>
-          </div>
-        </div>
+      <div class="guide-image-wrap">
+        <img src="/가이드북.png" alt="사용 가이드" class="guide-image" />
       </div>
 
       <div class="modal-actions">
@@ -64,68 +36,32 @@ defineEmits(['close'])
 .modal {
   background: #fff;
   border-radius: 16px;
-  padding: 32px;
-  width: 480px;
+  padding: 28px;
+  width: 560px;
   max-width: calc(100vw - 32px);
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
 
 .modal-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-
-.modal-icon {
-  font-size: 24px;
+  margin-bottom: 16px;
 }
 
 .modal-header h2 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
 }
 
-.notice-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 28px;
+.guide-image-wrap {
+  margin-bottom: 24px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
 }
 
-.notice-item {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.notice-num {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notice-item strong {
+.guide-image {
+  width: 100%;
   display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 3px;
-}
-
-.notice-item p {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
 }
 
 .modal-actions {
