@@ -30,7 +30,7 @@
 
     <div class="tab-content">
       <!-- 메모장 -->
-      <div v-if="activeTab === 'memo'" class="memo-area">
+      <div v-show="activeTab === 'memo'" class="memo-area">
         <div class="memo-toolbar">
           <button class="memo-action" @click="clearMemo">전체 지우기</button>
         </div>
@@ -43,7 +43,7 @@
       </div>
 
       <!-- 그림판 -->
-      <div v-if="activeTab === 'draw'" class="draw-area">
+      <div v-show="activeTab === 'draw'" class="draw-area">
         <DrawingBoard ref="drawRef" />
       </div>
     </div>

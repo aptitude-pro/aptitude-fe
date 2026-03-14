@@ -1,29 +1,30 @@
 <template>
   <div class="drawing-board">
     <div class="draw-toolbar">
-      <div class="color-group">
-        <button
-          v-for="c in colors"
-          :key="c"
-          :class="['color-btn', { active: currentColor === c }]"
-          :style="{ background: c }"
-          @click="currentColor = c"
-        ></button>
-      </div>
       <div class="size-group">
         <button
           v-for="s in sizes"
           :key="s"
-          :class="['size-btn', { active: currentSize === s }]"
-          @click="currentSize = s"
+          :class="['size-btn', { active: currentSize === s && !isEraser }]"
+          @click="setDraw(s)"
         >
-          <div :style="{ width: s + 'px', height: s + 'px', background: 'currentColor', borderRadius: '50%' }"></div>
+          <div :style="{ width: s + 'px', height: s + 'px', background: '#1f2937', borderRadius: '50%' }"></div>
         </button>
       </div>
-      <button class="tool-btn-sm" @click="setEraser" :class="{ active: isEraser }">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16 14 5l7 7-4 8z"/></svg>
-      </button>
-      <button class="tool-btn-sm" @click="clearCanvas">
+      <div class="divider"></div>
+      <div class="eraser-group">
+        <span class="label">지우개</span>
+        <button
+          v-for="s in eraserSizes"
+          :key="'e' + s"
+          :class="['size-btn', { active: isEraser && currentEraserSize === s }]"
+          @click="setEraser(s)"
+        >
+          <div :style="{ width: Math.min(s / 2, 16) + 'px', height: Math.min(s / 2, 16) + 'px', background: '#9ca3af', borderRadius: '50%', border: '1px solid #d1d5db' }"></div>
+        </button>
+      </div>
+      <div class="divider"></div>
+      <button class="tool-btn-sm" @click="clearCanvas" title="전체 지우기">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
       </button>
     </div>
@@ -42,18 +43,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 
 const canvasRef = ref(null)
-const colors = ['#000000', '#ef4444', '#3b82f6', '#10b981', '#f59e0b']
 const sizes = [2, 4, 7]
-const currentColor = ref('#000000')
+const eraserSizes = [10, 20, 40]
 const currentSize = ref(2)
+const currentEraserSize = ref(20)
 const isEraser = ref(false)
 let drawing = false
 let ctx = null
+let lastX = 0
+let lastY = 0
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick()
   const canvas = canvasRef.value
   ctx = canvas.getContext('2d')
   resize()
@@ -64,11 +68,14 @@ onUnmounted(() => window.removeEventListener('resize', resize))
 
 function resize() {
   const canvas = canvasRef.value
-  const parent = canvas.parentElement
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  canvas.width = parent.offsetWidth
-  canvas.height = Math.max(200, parent.offsetHeight - 40)
-  ctx.putImageData(data, 0, 0)
+  const rect = canvas.getBoundingClientRect()
+  const newW = Math.floor(rect.width)
+  const newH = Math.floor(rect.height)
+  if (newW === 0 || newH === 0) return
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  canvas.width = newW
+  canvas.height = newH
+  ctx.putImageData(imageData, 0, 0)
 }
 
 function getPos(e) {
@@ -79,33 +86,39 @@ function getPos(e) {
 function startDraw(e) {
   drawing = true
   const pos = getPos(e)
-  ctx.beginPath()
-  ctx.moveTo(pos.x, pos.y)
+  lastX = pos.x
+  lastY = pos.y
 }
 
 function draw(e) {
   if (!drawing) return
   const pos = getPos(e)
-  ctx.lineWidth = isEraser.value ? 20 : currentSize.value
+  ctx.beginPath()
+  ctx.moveTo(lastX, lastY)
+  ctx.lineTo(pos.x, pos.y)
+  ctx.lineWidth = isEraser.value ? currentEraserSize.value : currentSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = isEraser.value ? '#ffffff' : currentColor.value
-  ctx.lineTo(pos.x, pos.y)
+  ctx.strokeStyle = isEraser.value ? '#ffffff' : '#000000'
   ctx.stroke()
+  lastX = pos.x
+  lastY = pos.y
 }
 
 function endDraw() { drawing = false }
 
-function startDrawTouch(e) {
-  const t = e.touches[0]
-  startDraw(t)
-}
-function drawTouch(e) {
-  const t = e.touches[0]
-  draw(t)
+function startDrawTouch(e) { startDraw(e.touches[0]) }
+function drawTouch(e) { draw(e.touches[0]) }
+
+function setDraw(s) {
+  isEraser.value = false
+  currentSize.value = s
 }
 
-function setEraser() { isEraser.value = !isEraser.value }
+function setEraser(s) {
+  isEraser.value = true
+  currentEraserSize.value = s
+}
 
 function clearCanvas() {
   ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
@@ -135,17 +148,19 @@ defineExpose({ getImageData, clearCanvas })
   flex-wrap: wrap;
 }
 
-.color-group { display: flex; gap: 4px; }
-.color-btn {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  transition: border-color 0.1s;
+.label {
+  font-size: 11px;
+  color: #6b7280;
 }
-.color-btn.active { border-color: #374151; }
 
-.size-group { display: flex; align-items: center; gap: 6px; }
+.divider {
+  width: 1px;
+  height: 18px;
+  background: #e5e7eb;
+}
+
+.size-group, .eraser-group { display: flex; align-items: center; gap: 6px; }
+
 .size-btn {
   width: 22px;
   height: 22px;
@@ -154,9 +169,9 @@ defineExpose({ getImageData, clearCanvas })
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #374151;
 }
-.size-btn.active { background: #e5e7eb; }
+.size-btn.active { background: #e5e7eb; outline: 2px solid #374151; }
+.size-btn:hover { background: #e5e7eb; }
 
 .tool-btn-sm {
   width: 22px;
@@ -168,8 +183,7 @@ defineExpose({ getImageData, clearCanvas })
   justify-content: center;
   color: #374151;
 }
-.tool-btn-sm.active { background: #1f2937; color: #fff; }
-.tool-btn-sm:hover { background: #e5e7eb; }
+.tool-btn-sm:hover { background: #fecaca; color: #dc2626; }
 
 .draw-canvas {
   flex: 1;
