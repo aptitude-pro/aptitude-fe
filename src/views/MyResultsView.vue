@@ -52,7 +52,7 @@
       <div v-if="chartTab === 'category'">
         <div class="category-checks">
           <button
-            v-for="(cat, idx) in SKCT_CATEGORIES"
+            v-for="(cat, idx) in activeCategories"
             :key="cat"
             :class="['cat-pill', { active: selectedCategories.includes(cat) }]"
             :style="selectedCategories.includes(cat) ? { background: CATEGORY_COLORS[idx], borderColor: CATEGORY_COLORS[idx] } : {}"
@@ -66,7 +66,7 @@
           <template v-if="hasCategoryData">
             <ScoreLineChart :data="categoryGrowthChartData" :max="20" />
           </template>
-          <div v-else class="empty-state"><p>SKCT 데이터가 없습니다</p></div>
+          <div v-else class="empty-state"><p>{{ selectedType || 'SKCT' }} 데이터가 없습니다</p></div>
         </div>
       </div>
     </div>
@@ -113,7 +113,7 @@
           <tbody>
             <tr v-for="r in filteredResults" :key="r.id">
               <td class="name-cell">{{ r.examTitle || r.examType }}</td>
-              <td><span class="type-badge">{{ r.examType }}</span></td>
+              <td><span :class="['type-badge', r.examType]">{{ r.examType }}</span></td>
               <td class="meta-cell">{{ r.examYear || '-' }}</td>
               <td class="meta-cell">{{ r.examPeriod || '-' }}</td>
               <td class="meta-cell">{{ r.platform || '-' }}</td>
@@ -145,8 +145,15 @@ const selectedPeriod = ref('')
 const selectedPlatform = ref('')
 const chartTab = ref('total')
 
-const SKCT_CATEGORIES = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
+const EXAM_CATEGORIES = {
+  SKCT: ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'],
+  GSAT: ['수리논리', '추리'],
+  NCS: []
+}
+const SKCT_CATEGORIES = EXAM_CATEGORIES.SKCT
 const CATEGORY_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
+
+const activeCategories = computed(() => EXAM_CATEGORIES[selectedType.value] || SKCT_CATEGORIES)
 const selectedCategories = ref([...SKCT_CATEGORIES])
 
 onMounted(async () => {
@@ -159,6 +166,7 @@ onMounted(async () => {
 
 watch(selectedType, (type) => {
   resultStore.fetchGrowthData(type)
+  selectedCategories.value = [...(EXAM_CATEGORIES[type] || SKCT_CATEGORIES)]
 })
 
 const results = computed(() => resultStore.results)
@@ -192,13 +200,14 @@ const hasCategoryData = computed(() => {
 const categoryGrowthChartData = computed(() => {
   const data = resultStore.growthData || []
   const labels = data.map((_, i) => `#${i + 1}`)
-  const datasets = SKCT_CATEGORIES
+  const cats = activeCategories.value
+  const datasets = cats
     .filter(c => selectedCategories.value.includes(c))
-    .map((cat, idx) => ({
+    .map((cat) => ({
       label: cat,
       data: data.map(d => d.categoryScores?.[cat] ?? null),
-      borderColor: CATEGORY_COLORS[SKCT_CATEGORIES.indexOf(cat)],
-      backgroundColor: CATEGORY_COLORS[SKCT_CATEGORIES.indexOf(cat)] + '20',
+      borderColor: CATEGORY_COLORS[cats.indexOf(cat)],
+      backgroundColor: CATEGORY_COLORS[cats.indexOf(cat)] + '20',
       tension: 0.4,
       fill: false,
       pointRadius: 4,
@@ -387,6 +396,9 @@ function formatDate(d) {
   padding: 2px 7px;
   border-radius: 4px;
 }
+.type-badge.SKCT { background: #dbeafe; color: #1d4ed8; }
+.type-badge.GSAT { background: #fef3c7; color: #92400e; }
+.type-badge.NCS  { background: #d1fae5; color: #065f46; }
 .score-val { font-weight: 700; font-size: 14px; }
 .score-val.high { color: var(--success); }
 .score-val.mid { color: var(--warning); }

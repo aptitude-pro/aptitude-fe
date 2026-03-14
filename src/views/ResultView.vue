@@ -100,6 +100,18 @@ onMounted(async () => {
         categoryScores: catScores,
         answers: []
       }
+    } else if (route.query.answers) {
+      const answersMap = JSON.parse(route.query.answers)
+      const answeredCount = Object.keys(answersMap).length
+      result.value = {
+        totalScore: answeredCount,
+        correctCount: answeredCount,
+        totalCount: parseInt(route.query.questionCount) || 0,
+        examTitle: route.query.examName || 'GSAT',
+        examType: route.query.examName || 'GSAT',
+        categoryScores: null,
+        answers: []
+      }
     }
     loading.value = false
     return

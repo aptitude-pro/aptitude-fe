@@ -97,7 +97,7 @@
         <div v-else class="result-list">
           <div class="result-item" v-for="r in recentResults" :key="r.id">
             <div class="result-info">
-              <span class="result-type">{{ r.examType }}</span>
+              <span :class="['result-type', r.examType]">{{ r.examType }}</span>
               <span class="result-name">{{ r.examTitle }}</span>
             </div>
             <div class="result-score" :class="scoreClass(r.totalScore)">
@@ -403,6 +403,9 @@ function formatDate(dateStr) {
   border-radius: 4px;
   width: fit-content;
 }
+.result-type.SKCT { background: #dbeafe; color: #1d4ed8; }
+.result-type.GSAT { background: #fef3c7; color: #92400e; }
+.result-type.NCS  { background: #d1fae5; color: #065f46; }
 .result-name { font-size: 13px; font-weight: 500; }
 .result-score { font-size: 15px; font-weight: 700; }
 .score-high { color: var(--success); }
