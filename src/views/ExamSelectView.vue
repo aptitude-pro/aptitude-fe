@@ -98,10 +98,10 @@ const examTypes = [
     id: 'GSAT',
     name: 'GSAT',
     fullName: '삼성직무적성검사',
-    description: '언어논리, 수리논리, 추리, 시각적사고 영역 평가',
-    timeLimit: 90,
-    questionCount: 60,
-    available: false
+    description: '수리논리 20문항(30분) + 추리 30문항(30분), 오답 감점제 적용',
+    timeLimit: 60,
+    questionCount: 50,
+    available: true
   },
   {
     id: 'NCS',

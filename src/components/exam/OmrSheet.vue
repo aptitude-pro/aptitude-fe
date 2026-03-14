@@ -13,7 +13,7 @@
         <div
           v-for="n in props.questionCount"
           :key="n"
-          :class="['omr-row', { answered: props.answers[n] }]"
+          :class="['omr-row', { answered: props.answers[n], unanswered: props.showUnansweredWarning && !props.answers[n] }]"
         >
           <span class="q-num">{{ n }}</span>
           <div class="choices">
@@ -41,7 +41,8 @@ import { computed } from 'vue'
 
 const props = defineProps({
   questionCount: { type: Number, default: 40 },
-  answers: { type: Object, default: () => ({}) }
+  answers: { type: Object, default: () => ({}) },
+  showUnansweredWarning: { type: Boolean, default: false }
 })
 const emit = defineEmits(['mark', 'clear', 'submit'])
 
@@ -126,6 +127,7 @@ function confirmReset() {
 }
 .omr-row:hover { background: #f9fafb; }
 .omr-row.answered { background: #f0fdf4; }
+.omr-row.unanswered { background: #fff1f2; border: 1px solid #fca5a5; border-radius: 6px; }
 
 .q-num {
   font-size: 13px;
