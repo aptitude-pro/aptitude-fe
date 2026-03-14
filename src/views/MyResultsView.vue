@@ -51,11 +51,16 @@
       <!-- 분야별 추이 -->
       <div v-if="chartTab === 'category'">
         <div class="category-checks">
-          <label v-for="(cat, idx) in SKCT_CATEGORIES" :key="cat" class="check-label">
-            <input type="checkbox" :value="cat" v-model="selectedCategories" />
-            <span class="check-dot" :style="{ background: CATEGORY_COLORS[idx] }"></span>
+          <button
+            v-for="(cat, idx) in SKCT_CATEGORIES"
+            :key="cat"
+            :class="['cat-pill', { active: selectedCategories.includes(cat) }]"
+            :style="selectedCategories.includes(cat) ? { background: CATEGORY_COLORS[idx], borderColor: CATEGORY_COLORS[idx] } : {}"
+            @click="toggleCategory(cat)"
+          >
+            <span class="pill-dot" :style="{ background: selectedCategories.includes(cat) ? '#fff' : CATEGORY_COLORS[idx] }"></span>
             {{ cat }}
-          </label>
+          </button>
         </div>
         <div class="chart-wrap">
           <template v-if="hasCategoryData">
@@ -233,6 +238,15 @@ const radarData = computed(() => {
   }
 })
 
+function toggleCategory(cat) {
+  const idx = selectedCategories.value.indexOf(cat)
+  if (idx >= 0) {
+    if (selectedCategories.value.length > 1) selectedCategories.value.splice(idx, 1)
+  } else {
+    selectedCategories.value.push(cat)
+  }
+}
+
 function scoreClass(score) {
   if (score >= 400) return 'high'
   if (score >= 300) return 'mid'
@@ -289,20 +303,30 @@ function formatDate(d) {
 .category-checks {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 0 4px;
+  gap: 8px;
+  padding: 12px 0 8px;
 }
-.check-label {
+
+.cat-pill {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 14px 5px 10px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  color: var(--text);
+  transition: all 0.15s;
 }
-.check-dot {
-  width: 10px;
-  height: 10px;
+.cat-pill:hover { border-color: #9ca3af; color: var(--text); }
+.cat-pill.active { color: #fff; font-weight: 600; }
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
