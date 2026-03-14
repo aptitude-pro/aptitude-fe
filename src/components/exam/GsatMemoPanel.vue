@@ -1,17 +1,16 @@
 <template>
-  <div class="tool-panel">
-    <!-- 타이머 -->
-    <div class="mini-timer-section">
-      <div class="mini-timer-top">
+  <div class="gsat-memo-panel">
+    <!-- 타이머 섹션 -->
+    <div class="timer-section">
+      <div class="timer-top">
         <select v-model="localMinutes" class="time-select" @change="onTimeSelect">
           <option v-for="m in timeOptions" :key="m" :value="m">{{ m }}분</option>
         </select>
-        <button class="timer-help" title="도움말">?</button>
       </div>
-      <div class="mini-time-display" :class="{ warn: timerWarn, danger: timerDanger }">
-        {{ formattedLocalTime }}
+      <div class="time-display" :class="{ warn: timerWarn, danger: timerDanger }">
+        {{ formattedTime }}
       </div>
-      <div class="mini-timer-btns">
+      <div class="timer-btns">
         <button
           :class="['timer-btn', timerRunning ? 'stop' : 'start']"
           @click="toggleTimer"
@@ -22,62 +21,34 @@
       </div>
     </div>
 
-    <!-- 메모장 / 그림판 탭 -->
-    <div class="tool-tabs">
-      <button :class="['tool-tab', { active: activeTab === 'memo' }]" @click="activeTab = 'memo'">메모장</button>
-      <button :class="['tool-tab', { active: activeTab === 'draw' }]" @click="activeTab = 'draw'">그림판</button>
+    <!-- 메모장 -->
+    <div class="memo-header">
+      <span class="panel-label">📝 메모장</span>
+      <button class="memo-clear-btn" @click="clearMemo">전체 지우기</button>
     </div>
-
-    <div class="tab-content">
-      <!-- 메모장 -->
-      <div v-show="activeTab === 'memo'" class="memo-area">
-        <div class="memo-toolbar">
-          <button class="memo-action" @click="clearMemo">전체 지우기</button>
-        </div>
-        <textarea
-          class="memo-input"
-          placeholder="메모를 입력하세요..."
-          :value="props.memoText"
-          @input="$emit('update-memo', $event.target.value)"
-        ></textarea>
-      </div>
-
-      <!-- 그림판 -->
-      <div v-show="activeTab === 'draw'" class="draw-area">
-        <DrawingBoard ref="drawRef" />
-      </div>
-    </div>
-
-    <!-- 계산기 -->
-    <div class="calc-section">
-      <div class="calc-label">계산기</div>
-      <Calculator />
-    </div>
+    <textarea
+      class="memo-input"
+      placeholder="메모를 입력하세요..."
+      :value="props.memoText"
+      @input="$emit('update-memo', $event.target.value)"
+    ></textarea>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import DrawingBoard from './DrawingBoard.vue'
-import Calculator from './Calculator.vue'
 
 const props = defineProps({
-  sessionId: String,
-  memoText: String,
+  memoText: { type: String, default: '' },
   totalSeconds: { type: Number, default: 0 },
   remaining: { type: Number, default: 0 },
   timerRunning: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset'])
 
-const activeTab = ref('memo')
-const drawRef = ref(null)
-
-// 15분 단위 시간 선택
 const timeOptions = [0, 15, 30, 45, 60, 75, 90, 105, 120, 150, 180]
 const localMinutes = ref(60)
 
-// 타이머 표시: 시작 후엔 remaining prop, 그 전엔 선택된 시간
 const displaySeconds = computed(() => {
   if (props.remaining > 0 || props.timerRunning) return props.remaining
   return props.totalSeconds || localMinutes.value * 60
@@ -86,7 +57,7 @@ const displaySeconds = computed(() => {
 const timerWarn = computed(() => displaySeconds.value <= 300 && displaySeconds.value > 60)
 const timerDanger = computed(() => displaySeconds.value <= 60)
 
-const formattedLocalTime = computed(() => {
+const formattedTime = computed(() => {
   const secs = displaySeconds.value
   const m = Math.floor(secs / 60)
   const s = secs % 60
@@ -119,24 +90,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tool-panel {
+.gsat-memo-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: #fff;
-  overflow-y: auto;
 }
 
-.mini-timer-section {
+.timer-section {
   padding: 12px 14px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
 }
 
-.mini-timer-top {
+.timer-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 8px;
 }
 
@@ -149,20 +118,7 @@ onMounted(() => {
   outline: none;
 }
 
-.timer-help {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mini-time-display {
+.time-display {
   font-size: 22px;
   font-weight: 700;
   text-align: center;
@@ -170,10 +126,10 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
   transition: color 0.3s;
 }
-.mini-time-display.warn { color: #f59e0b; }
-.mini-time-display.danger { color: #ef4444; }
+.time-display.warn { color: #f59e0b; }
+.time-display.danger { color: #ef4444; }
 
-.mini-timer-btns {
+.timer-btns {
   display: flex;
   gap: 8px;
 }
@@ -190,53 +146,28 @@ onMounted(() => {
 .timer-btn.stop { background: #ef4444; color: #fff; }
 .timer-btn.reset { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
 
-.tool-tabs {
+.memo-header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
 }
-.tool-tab {
-  flex: 1;
-  padding: 9px;
+
+.panel-label {
   font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  background: transparent;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s;
-}
-.tool-tab.active {
-  color: #1f2937;
   font-weight: 600;
-  border-bottom-color: #1f2937;
-  background: #fff;
 }
 
-.tab-content {
-  flex: 1;
-  min-height: 160px;
-}
-
-.memo-area, .draw-area {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.memo-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 6px 10px;
-  border-bottom: 1px solid #f3f4f6;
-}
-.memo-action {
+.memo-clear-btn {
   font-size: 11px;
   color: #6b7280;
   background: #f3f4f6;
   padding: 3px 8px;
   border-radius: 4px;
 }
-.memo-action:hover { background: #e5e7eb; }
+.memo-clear-btn:hover { background: #e5e7eb; }
 
 .memo-input {
   flex: 1;
@@ -248,20 +179,6 @@ onMounted(() => {
   resize: none;
   color: #374151;
   background: #fff;
-  min-height: 150px;
 }
 .memo-input::placeholder { color: #9ca3af; }
-
-.draw-area { padding: 0; }
-
-.calc-section {
-  border-top: 1px solid #e5e7eb;
-  flex-shrink: 0;
-}
-.calc-label {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 14px 6px;
-  border-bottom: 1px solid #f3f4f6;
-}
 </style>

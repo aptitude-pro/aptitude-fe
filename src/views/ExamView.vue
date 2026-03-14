@@ -29,7 +29,7 @@
     <div v-if="timerWarning" class="timer-warning-banner">{{ timerWarning }}</div>
 
     <!-- 본문 3열 -->
-    <div class="exam-body" ref="bodyRef">
+    <div class="exam-body" :class="{ 'gsat-mode': examType === 'GSAT' }" ref="bodyRef">
       <!-- 좌: PDF 뷰어 -->
       <div class="panel panel-pdf" :style="{ flex: panelWidths[0] }">
         <PdfViewer />
@@ -43,6 +43,7 @@
         <OmrSheet
           :questionCount="questionCount"
           :answers="examStore.answers"
+          :showUnansweredWarning="showSubmitDialog"
           @mark="handleMark"
           @clear="handleClear"
           @submit="showSubmitDialog = true"
@@ -52,9 +53,22 @@
       <!-- 드래그 핸들 2 -->
       <div class="divider" @mousedown="startDrag(1)" />
 
-      <!-- 우: 도구 패널 -->
+      <!-- 우: 도구 패널 (GSAT는 메모장만) -->
       <div class="panel panel-tools" :style="{ flex: panelWidths[2] }">
+        <GsatMemoPanel
+          v-if="examType === 'GSAT'"
+          :memoText="examStore.memoText"
+          :totalSeconds="totalSeconds"
+          :remaining="remainingSeconds"
+          :timerRunning="timerRunning"
+          @update-memo="examStore.memoText = $event"
+          @update-time-limit="handleTimeLimitUpdate"
+          @timer-start="timerRunning = true"
+          @timer-stop="timerRunning = false"
+          @timer-reset="handleTimerReset"
+        />
         <ToolPanel
+          v-else
           :sessionId="sessionId"
           :memoText="examStore.memoText"
           :totalSeconds="totalSeconds"
@@ -100,6 +114,9 @@
         <p v-if="unansweredCount > 0" class="warn-text">
           ⚠️ 미응답 문항이 {{ unansweredCount }}개 있습니다.
         </p>
+        <p v-if="examType === 'GSAT'" class="gsat-penalty-hint">
+          ⚠️ GSAT는 오답 감점제가 적용됩니다. 확실하지 않은 문항은 신중하게 선택하세요.
+        </p>
         <p class="dialog-hint">제출 후에는 답안을 수정할 수 없습니다.</p>
         <div class="dialog-actions">
           <button class="btn-secondary" @click="showSubmitDialog = false">취소</button>
@@ -120,6 +137,7 @@ import ExamTimer from '@/components/exam/ExamTimer.vue'
 import PdfViewer from '@/components/exam/PdfViewer.vue'
 import OmrSheet from '@/components/exam/OmrSheet.vue'
 import ToolPanel from '@/components/exam/ToolPanel.vue'
+import GsatMemoPanel from '@/components/exam/GsatMemoPanel.vue'
 import ScoreInputModal from '@/components/exam/ScoreInputModal.vue'
 
 const route = useRoute()
@@ -139,7 +157,7 @@ const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const submitting = ref(false)
-const panelWidths = ref([3.5, 1, 1.5])
+const panelWidths = ref(examType === 'GSAT' ? [3, 1.5, 1.5] : [3.5, 1, 1.5])
 const bodyRef = ref(null)
 let draggingIdx = -1
 let startX = 0
@@ -398,8 +416,8 @@ function stopDrag() {
 
 .panel-omr {
   display: flex;
-  justify-content: center;
 }
+
 
 .divider {
   width: 5px;
@@ -431,6 +449,7 @@ function stopDrag() {
 .dialog p { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
 .dialog p strong { color: var(--text); }
 .warn-text { color: var(--warning) !important; font-weight: 500; }
+.gsat-penalty-hint { color: #b45309 !important; font-weight: 500; background: #fef3c7; padding: 6px 8px; border-radius: 6px; font-size: 12px; }
 .dialog-hint { font-size: 12px; color: var(--text-light); }
 .dialog-actions { display: flex; gap: 10px; margin-top: 20px; }
 .dialog-actions button { flex: 1; padding: 11px; border-radius: 8px; font-size: 14px; font-weight: 600; }

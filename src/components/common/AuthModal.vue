@@ -38,8 +38,23 @@
         </div>
         <div class="form-group">
           <label>이메일</label>
-          <input v-model="registerForm.email" type="email" placeholder="email@example.com" required />
+          <div class="email-row">
+            <input v-model="registerForm.email" type="email" placeholder="email@example.com" required :disabled="emailVerified" />
+            <button type="button" class="btn-send-code" :disabled="sendingCode || emailVerified" @click="handleSendCode">
+              {{ emailVerified ? '인증완료' : sendingCode ? '발송 중...' : emailSent ? '재발송' : '인증코드 발송' }}
+            </button>
+          </div>
         </div>
+        <div v-if="emailSent && !emailVerified" class="form-group">
+          <label>인증코드</label>
+          <div class="email-row">
+            <input v-model="verifyCode" type="text" placeholder="6자리 코드 입력" maxlength="6" />
+            <button type="button" class="btn-send-code" :disabled="verifyingCode" @click="handleVerifyCode">
+              {{ verifyingCode ? '확인 중...' : '인증 확인' }}
+            </button>
+          </div>
+        </div>
+        <p v-if="emailVerified" class="verify-success">이메일 인증이 완료되었습니다.</p>
         <div class="form-group">
           <label>비밀번호</label>
           <input v-model="registerForm.password" type="password" placeholder="8자 이상" required minlength="8" />
@@ -66,7 +81,7 @@
           이용약관 및 개인정보처리방침에 동의합니다
         </label>
         <p v-if="error" class="error-msg">{{ error }}</p>
-        <button type="submit" class="btn-submit" :disabled="loading">
+        <button type="submit" class="btn-submit" :disabled="loading || !emailVerified">
           {{ loading ? '가입 중...' : '회원가입' }}
         </button>
       </form>
@@ -75,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
@@ -89,6 +104,12 @@ const registerForm = ref({
   nickname: '', email: '', password: '', passwordConfirm: '',
   targetExam: 'SKCT', agree: false
 })
+
+const emailSent = ref(false)
+const emailVerified = ref(false)
+const verifyCode = ref('')
+const sendingCode = ref(false)
+const verifyingCode = ref(false)
 
 const pwStrength = computed(() => {
   const pw = registerForm.value.password
@@ -115,6 +136,38 @@ async function handleLogin() {
   loading.value = false
   if (result.success) {
     router.push('/dashboard')
+  } else {
+    error.value = result.message
+  }
+}
+
+watch(() => registerForm.value.email, () => {
+  emailSent.value = false
+  emailVerified.value = false
+  verifyCode.value = ''
+})
+
+async function handleSendCode() {
+  error.value = ''
+  sendingCode.value = true
+  const result = await auth.sendEmailCode(registerForm.value.email)
+  sendingCode.value = false
+  if (result.success) {
+    emailSent.value = true
+    emailVerified.value = false
+    verifyCode.value = ''
+  } else {
+    error.value = result.message
+  }
+}
+
+async function handleVerifyCode() {
+  error.value = ''
+  verifyingCode.value = true
+  const result = await auth.verifyEmailCode(registerForm.value.email, verifyCode.value)
+  verifyingCode.value = false
+  if (result.success) {
+    emailVerified.value = true
   } else {
     error.value = result.message
   }
@@ -277,5 +330,34 @@ async function handleRegister() {
   font-weight: 600;
   text-decoration: underline;
   padding: 0;
+}
+
+.email-row {
+  display: flex;
+  gap: 8px;
+}
+.email-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-send-code {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-send-code:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-send-code:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.verify-success {
+  color: #10b981;
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>

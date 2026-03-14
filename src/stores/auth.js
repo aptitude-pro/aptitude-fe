@@ -45,6 +45,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function sendEmailCode(email) {
+    try {
+      await apiClient.post('/auth/email/send-code', { email })
+      return { success: true }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '인증코드 발송에 실패했습니다.' }
+    }
+  }
+
+  async function verifyEmailCode(email, code) {
+    try {
+      await apiClient.post('/auth/email/verify', { email, code })
+      return { success: true }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '인증코드가 올바르지 않습니다.' }
+    }
+  }
+
   async function register(payload) {
     try {
       const res = await apiClient.post('/auth/register', payload)
@@ -66,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, accessToken, isLoggedIn, showModal, modalTab,
-    openModal, closeModal, login, register, logout, setAuth, clearAuth
+    openModal, closeModal, login, register, logout, setAuth, clearAuth,
+    sendEmailCode, verifyEmailCode
   }
 })
