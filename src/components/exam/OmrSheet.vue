@@ -115,13 +115,13 @@ function confirmReset() {
   overflow-y: auto;
 }
 
-.omr-list { padding: 8px 6px; }
+.omr-list { padding: 6px 8px; }
 
 .omr-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 4px;
+  gap: 4px;
+  padding: 4px 2px;
   border-radius: 6px;
   transition: background 0.1s;
 }
@@ -141,12 +141,14 @@ function confirmReset() {
 .choices {
   flex: 1;
   display: flex;
-  justify-content: space-between;
+  gap: 4px;
 }
 
 .choice-btn {
-  width: 28px;
-  height: 28px;
+  flex: 1;
+  min-width: 0;
+  max-width: 80px;
+  aspect-ratio: 1;
   border-radius: 50%;
   border: 1.5px solid #d1d5db;
   background: #fff;

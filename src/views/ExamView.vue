@@ -39,7 +39,7 @@
       <div class="divider" @mousedown="startDrag(0)" />
 
       <!-- 중: OMR 답안지 -->
-      <div class="panel panel-omr" :style="{ flex: panelWidths[1] }">
+      <div class="panel panel-omr">
         <OmrSheet
           :questionCount="questionCount"
           :answers="examStore.answers"
@@ -157,7 +157,7 @@ const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const submitting = ref(false)
-const panelWidths = ref(examType === 'GSAT' ? [3, 1.5, 1.5] : [3.5, 1, 1.5])
+const panelWidths = ref(examType === 'GSAT' ? [3.5, 1, 1.5] : [3.5, 1, 1.5])
 const bodyRef = ref(null)
 let draggingIdx = -1
 let startX = 0
@@ -416,6 +416,13 @@ function stopDrag() {
 
 .panel-omr {
   display: flex;
+  flex: 0 0 220px;
+  width: 220px;
+}
+
+.panel-omr > * {
+  width: 100%;
+  min-width: 0;
 }
 
 
