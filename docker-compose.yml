@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aptitude-frontend
+    ports:
+      - "80:80"
+    networks:
+      - aptitude-net
+
+networks:
+  aptitude-net:
+    external: true
+    name: aptitude-net
