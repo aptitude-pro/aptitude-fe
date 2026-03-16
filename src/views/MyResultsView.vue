@@ -410,4 +410,12 @@ function formatDate(d) {
   color: var(--primary);
   font-weight: 500;
 }
+
+@media (max-width: 768px) {
+  .card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .filter-group { width: 100%; }
+  .filter-select { flex: 1; min-width: 0; }
+  .result-table-wrap { overflow-x: auto; }
+  .meta-cell { display: none; }
+}
 </style>

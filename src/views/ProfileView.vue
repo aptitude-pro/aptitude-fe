@@ -333,4 +333,8 @@ function formatDate(d) {
   transition: all 0.15s;
 }
 .btn-delete:hover { background: #fee2e2; }
+
+@media (max-width: 768px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}
 </style>

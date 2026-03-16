@@ -92,9 +92,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useResultStore } from '@/stores/result'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
+const resultStore = useResultStore()
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
@@ -129,13 +131,27 @@ const pwColor = computed(() => {
   return '#10b981'
 })
 
+async function afterAuth() {
+  const raw = sessionStorage.getItem('pendingManualResult')
+  if (raw) {
+    sessionStorage.removeItem('pendingManualResult')
+    const { scores, ...meta } = JSON.parse(raw)
+    const saved = await resultStore.saveManualResult(null, scores, meta)
+    if (saved.success) {
+      router.push(`/results/${saved.resultId}`)
+      return
+    }
+  }
+  router.push(auth.consumePendingRedirect() || '/dashboard')
+}
+
 async function handleLogin() {
   error.value = ''
   loading.value = true
   const result = await auth.login(loginForm.value.email, loginForm.value.password)
   loading.value = false
   if (result.success) {
-    router.push('/dashboard')
+    await afterAuth()
   } else {
     error.value = result.message
   }
@@ -188,7 +204,7 @@ async function handleRegister() {
   })
   loading.value = false
   if (result.success) {
-    router.push('/dashboard')
+    await afterAuth()
   } else {
     error.value = result.message
   }

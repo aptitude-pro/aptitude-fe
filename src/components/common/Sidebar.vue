@@ -1,5 +1,6 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ open: sidebarOpen }">
+    <button class="close-btn" @click="toggleSidebar" aria-label="사이드바 닫기">✕</button>
     <div class="sidebar-logo" @click="router.push(auth.isLoggedIn ? '/dashboard' : '/exam')" style="cursor: pointer;">
       <div class="logo-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -64,11 +65,15 @@
 </template>
 
 <script setup>
+import { inject } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const sidebarOpen = inject('sidebarOpen')
+const toggleSidebar = inject('toggleSidebar')
 
 async function handleLogout() {
   await auth.logout()
@@ -88,6 +93,11 @@ async function handleLogout() {
   flex-direction: column;
   z-index: 100;
   padding: 0;
+  transform: translateX(-100%);
+  transition: transform 0.25s;
+}
+.sidebar.open {
+  transform: translateX(0);
 }
 
 .sidebar-logo {
@@ -168,5 +178,26 @@ async function handleLogout() {
 .logout-btn:hover {
   color: #ef4444;
   background: rgba(239,68,68,0.1);
+}
+
+.close-btn {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: rgba(255,255,255,0.6);
+  background: transparent;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+}
+.close-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+@media (max-width: 768px) {
+  .close-btn { display: flex; }
 }
 </style>

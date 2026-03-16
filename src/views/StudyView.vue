@@ -104,10 +104,22 @@
             <input v-model.number="createForm.maxMembers" type="number" min="2" max="50" />
           </div>
           <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="createForm.isPublic" />
-              공개 스터디 (누구나 참가 신청 가능)
-            </label>
+            <label>공개 설정</label>
+            <div class="visibility-toggle">
+              <button type="button"
+                :class="['vis-btn', { active: createForm.isPublic }]"
+                @click="createForm.isPublic = true">
+                공개
+              </button>
+              <button type="button"
+                :class="['vis-btn', { active: !createForm.isPublic }]"
+                @click="createForm.isPublic = false">
+                비공개
+              </button>
+            </div>
+            <p class="vis-desc">
+              {{ createForm.isPublic ? '누구나 탐색하고 참가 신청할 수 있습니다' : '초대 코드를 가진 사람만 참가할 수 있습니다' }}
+            </p>
           </div>
           <p v-if="createError" class="error-msg">{{ createError }}</p>
           <div class="modal-actions">
@@ -319,7 +331,7 @@ async function joinPublicStudy(id) {
   background: #fff;
   border-radius: 16px;
   padding: 24px;
-  width: 400px;
+  width: 440px;
   max-width: calc(100vw - 32px);
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
@@ -328,11 +340,13 @@ async function joinPublicStudy(id) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
   margin-bottom: 20px;
 }
 .modal-header h3 { font-size: 17px; font-weight: 700; }
 .modal-close { font-size: 16px; color: var(--text-muted); background: none; }
-.modal-form { display: flex; flex-direction: column; gap: 12px; }
+.modal-form { display: flex; flex-direction: column; gap: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; }
 .form-group input, .form-group select {
   width: 100%;
@@ -341,9 +355,33 @@ async function joinPublicStudy(id) {
   border-radius: 8px;
   font-size: 14px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.form-group input:focus, .form-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.visibility-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.vis-btn {
+  flex: 1;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: #fff;
+  transition: all 0.15s;
+  border-right: 1px solid var(--border);
+}
+.vis-btn:last-child { border-right: none; }
+.vis-btn.active { background: #1f2937; color: #fff; font-weight: 600; }
+.vis-desc { font-size: 12px; color: var(--text-muted); margin-top: 6px; min-height: 16px; }
 .error-msg { color: var(--danger); font-size: 13px; }
-.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 8px; }
 .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; }
 </style>

@@ -13,7 +13,7 @@
         <div
           v-for="n in props.questionCount"
           :key="n"
-          :class="['omr-row', { answered: props.answers[n], unanswered: props.showUnansweredWarning && !props.answers[n] }]"
+          :class="['omr-row', { answered: props.answers[n], unanswered: props.showUnansweredWarning && !props.answers[n], guessed: props.guesses[n], wronged: props.wrongs[n] }]"
         >
           <span class="q-num">{{ n }}</span>
           <div class="choices">
@@ -26,6 +26,16 @@
               {{ c }}
             </button>
           </div>
+          <button
+            :class="['guess-btn', { active: props.guesses[n] }]"
+            @click="$emit('toggleGuess', n)"
+            title="찍었음"
+          >?</button>
+          <button
+            :class="['wrong-btn', { active: props.wrongs[n] }]"
+            @click="$emit('toggleWrong', n)"
+            title="틀린 것 같음"
+          >✗</button>
         </div>
       </div>
     </div>
@@ -42,9 +52,11 @@ import { computed } from 'vue'
 const props = defineProps({
   questionCount: { type: Number, default: 40 },
   answers: { type: Object, default: () => ({}) },
+  guesses: { type: Object, default: () => ({}) },
+  wrongs: { type: Object, default: () => ({}) },
   showUnansweredWarning: { type: Boolean, default: false }
 })
-const emit = defineEmits(['mark', 'clear', 'submit'])
+const emit = defineEmits(['mark', 'clear', 'submit', 'toggleGuess', 'toggleWrong'])
 
 const answeredCount = computed(() => Object.keys(props.answers).length)
 
@@ -181,5 +193,33 @@ function confirmReset() {
   flex-shrink: 0;
 }
 
-/* OMR 접기 버튼용 세로 텍스트 영역 */
+.guess-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.guess-btn:hover { border-color: #9ca3af; color: #6b7280; }
+.guess-btn.active { background: #fef3c7; color: #d97706; border-color: #fcd34d; }
+.omr-row.guessed .q-num { color: #d97706; }
+
+.wrong-btn {
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 10px; font-weight: 700;
+  background: #f3f4f6; color: #9ca3af; border: 1px solid #e5e7eb;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.wrong-btn:hover { border-color: #fca5a5; color: #ef4444; }
+.wrong-btn.active { background: #fff1f2; color: #ef4444; border-color: #fca5a5; }
+.omr-row.wronged .q-num { color: #ef4444; }
 </style>

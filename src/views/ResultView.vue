@@ -18,14 +18,30 @@
           <div class="sum-sub">{{ result?.examTitle || result?.examType }}</div>
         </div>
         <div class="summary-card">
-          <div class="sum-label">정답 수</div>
-          <div class="sum-val">{{ result?.correctCount || 0 }}</div>
-          <div class="sum-sub">/ {{ result?.totalCount || questionCount }}문항</div>
+          <div class="sum-label">푼 문제 수</div>
+          <div class="sum-val">{{ answeredCount }}</div>
+          <div class="sum-sub">/ {{ questionCount }}문항</div>
         </div>
         <div class="summary-card">
           <div class="sum-label">소요 시간</div>
           <div class="sum-val">{{ elapsedTime }}</div>
           <div class="sum-sub">분:초</div>
+        </div>
+      </div>
+
+      <!-- 헷갈린/틀린 문항 -->
+      <div v-if="guessedList.length || wrongList.length" class="marks-summary card">
+        <div v-if="guessedList.length" class="mark-row">
+          <span class="mark-label guess">? 헷갈린 문항 ({{ guessedList.length }}개)</span>
+          <div class="mark-chips">
+            <span v-for="n in guessedList" :key="n" class="chip guess">{{ n }}번</span>
+          </div>
+        </div>
+        <div v-if="wrongList.length" class="mark-row">
+          <span class="mark-label wrong">✗ 틀린 것 같은 문항 ({{ wrongList.length }}개)</span>
+          <div class="mark-chips">
+            <span v-for="n in wrongList" :key="n" class="chip wrong">{{ n }}번</span>
+          </div>
         </div>
       </div>
 
@@ -52,38 +68,65 @@
         </div>
       </div>
 
-      <!-- 문항별 정오답 -->
-      <div class="card">
-        <h3>문항별 정오답</h3>
-        <div class="answer-grid">
-          <div
-            v-for="item in answerItems"
-            :key="item.questionNo"
-            :class="['answer-item', item.isCorrect ? 'correct' : 'wrong']"
-          >
-            <span class="q-no">{{ item.questionNo }}</span>
-            <span :class="['q-mark', item.isCorrect ? 'o' : 'x']">
-              {{ item.isCorrect ? '○' : '✗' }}
-            </span>
+      <!-- 답안 상세 -->
+      <div v-if="overlaidAnswers.length" class="card answer-detail-card">
+        <div class="answer-detail-header">
+          <h3>답안 상세</h3>
+          <div class="filter-tabs">
+            <button :class="['tab', { active: answerFilter === 'all' }]" @click="answerFilter = 'all'">전체</button>
+            <button :class="['tab', { active: answerFilter === 'marked' }]" @click="answerFilter = 'marked'">표시된 문항</button>
+          </div>
+        </div>
+        <div class="answer-detail-grid">
+          <div v-for="a in filteredAnswers" :key="a.questionNo"
+               :class="['answer-cell', { guessed: a.isGuessed, wrong: a.isWrong }]">
+            <span class="cell-no">{{ a.questionNo }}</span>
+            <span class="cell-answer">{{ a.selectedAnswer ? circleNum(a.selectedAnswer) : '─' }}</span>
+            <div class="cell-badges">
+              <span v-if="a.isGuessed" class="badge-guess">?</span>
+              <span v-if="a.isWrong" class="badge-wrong">✗</span>
+            </div>
           </div>
         </div>
       </div>
+
     </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+const EXAM_QUESTION_COUNT = { SKCT: 100, GSAT: 50, NCS: 50 }
+const SKCT_CATEGORY_ORDER = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
+
+function sortedCategoryEntries(data) {
+  return Object.entries(data).sort(([a], [b]) => {
+    const ai = SKCT_CATEGORY_ORDER.indexOf(a)
+    const bi = SKCT_CATEGORY_ORDER.indexOf(b)
+    if (ai === -1 && bi === -1) return 0
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
+
 import { useRoute } from 'vue-router'
 import { useResultStore } from '@/stores/result'
+import { useExamStore } from '@/stores/exam'
 import CategoryRadarChart from '@/components/dashboard/CategoryRadarChart.vue'
 
 const route = useRoute()
 const resultStore = useResultStore()
+const examStore = useExamStore()
 const loading = ref(true)
 const result = ref(null)
+const savedMarks = ref({ guesses: {}, wrongs: {} })
 
-const questionCount = parseInt(route.query.questionCount) || 40
+const questionCount = computed(() => {
+  const type = result.value?.examType || route.query.examType
+  return EXAM_QUESTION_COUNT[type] || parseInt(route.query.questionCount) || 40
+})
 
 onMounted(async () => {
   const id = route.params.id
@@ -119,6 +162,22 @@ onMounted(async () => {
   await resultStore.fetchResult(id)
   result.value = resultStore.currentResult
   loading.value = false
+
+  const storeHasMarks =
+    Object.keys(examStore.guesses).length > 0 ||
+    Object.keys(examStore.wrongs).length > 0
+
+  if (storeHasMarks) {
+    const marks = {
+      guesses: { ...examStore.guesses },
+      wrongs: { ...examStore.wrongs }
+    }
+    localStorage.setItem(`result_marks_${id}`, JSON.stringify(marks))
+    savedMarks.value = marks
+  } else {
+    const stored = localStorage.getItem(`result_marks_${id}`)
+    if (stored) savedMarks.value = JSON.parse(stored)
+  }
 })
 
 const elapsedTime = computed(() => {
@@ -135,10 +194,18 @@ function scoreClass(score) {
   return 'low'
 }
 
+const overlaidAnswers = computed(() => {
+  return (result.value?.answers ?? []).map(a => ({
+    ...a,
+    isGuessed: a.isGuessed || !!examStore.guesses[a.questionNo] || !!savedMarks.value.guesses[a.questionNo],
+    isWrong:   a.isWrong   || !!examStore.wrongs[a.questionNo]  || !!savedMarks.value.wrongs[a.questionNo]
+  }))
+})
+
 const categoryBars = computed(() => {
   const data = result.value?.categoryScores || {}
   const colors = ['#111827', '#374151', '#6b7280', '#9ca3af']
-  return Object.entries(data).map(([name, rate], i) => ({
+  return sortedCategoryEntries(data).map(([name, rate], i) => ({
     name, rate, color: colors[i % colors.length]
   }))
 })
@@ -146,11 +213,12 @@ const categoryBars = computed(() => {
 const radarData = computed(() => {
   const data = result.value?.categoryScores
   if (!data) return null
+  const sorted = sortedCategoryEntries(data)
   return {
-    labels: Object.keys(data),
+    labels: sorted.map(([name]) => name),
     datasets: [{
       label: '점수',
-      data: Object.values(data),
+      data: sorted.map(([, val]) => val),
       backgroundColor: 'rgba(17,24,39,0.1)',
       borderColor: '#111827',
       pointBackgroundColor: '#111827'
@@ -158,15 +226,32 @@ const radarData = computed(() => {
   }
 })
 
-const answerItems = computed(() => {
-  if (!result.value?.answers) return []
-  return result.value.answers.map(a => ({
-    questionNo: a.questionNo,
-    isCorrect: a.selectedAnswer === a.correctAnswer,
-    selected: a.selectedAnswer,
-    correct: a.correctAnswer
-  }))
+const answeredCount = computed(() =>
+  overlaidAnswers.value.length
+    ? overlaidAnswers.value.filter(a => a.selectedAnswer != null).length
+    : result.value?.correctCount ?? 0
+)
+
+const guessedList = computed(() =>
+  overlaidAnswers.value.filter(a => a.isGuessed).map(a => a.questionNo)
+)
+
+const wrongList = computed(() =>
+  overlaidAnswers.value.filter(a => a.isWrong).map(a => a.questionNo)
+)
+
+const answerFilter = ref('all')
+
+const filteredAnswers = computed(() => {
+  if (answerFilter.value === 'marked')
+    return overlaidAnswers.value.filter(a => a.isGuessed || a.isWrong)
+  return overlaidAnswers.value
 })
+
+function circleNum(n) {
+  return ['①','②','③','④','⑤'][n - 1] ?? n
+}
+
 </script>
 
 <style scoped>
@@ -210,6 +295,15 @@ const answerItems = computed(() => {
 }
 .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
 
+.answer-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.answer-section-header h3 { margin-bottom: 0; }
+.answer-summary-chips { display: flex; gap: 8px; }
+
 .category-bars { display: flex; flex-direction: column; gap: 12px; }
 .cat-row { display: flex; align-items: center; gap: 10px; }
 .cat-name { font-size: 13px; width: 60px; flex-shrink: 0; }
@@ -219,7 +313,7 @@ const answerItems = computed(() => {
 
 .answer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
 }
 .answer-item {
@@ -230,7 +324,7 @@ const answerItems = computed(() => {
   padding: 8px 4px;
   border-radius: 8px;
   border: 1px solid;
-  gap: 4px;
+  gap: 2px;
 }
 .answer-item.correct { background: #f0fdf4; border-color: #86efac; }
 .answer-item.wrong { background: #fff1f2; border-color: #fca5a5; }
@@ -238,9 +332,73 @@ const answerItems = computed(() => {
 .q-mark { font-size: 16px; font-weight: 700; }
 .q-mark.o { color: var(--success); }
 .q-mark.x { color: var(--danger); }
+.q-selected { font-size: 11px; font-weight: 600; color: var(--text); }
+.q-correct-ans { font-size: 11px; color: var(--success); font-weight: 600; }
+
+.marks-summary { display: flex; flex-direction: column; gap: 12px; }
+.mark-row { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.mark-label {
+  font-size: 13px; font-weight: 600; white-space: nowrap; padding-top: 2px; flex-shrink: 0;
+}
+.mark-label.guess { color: #d97706; }
+.mark-label.wrong { color: #ef4444; }
+.mark-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 3px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500;
+}
+.chip.guess { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.chip.wrong { background: #fff1f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+.answer-detail-card { max-width: 100%; }
+.answer-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.answer-detail-header h3 { margin-bottom: 0; }
+.filter-tabs { display: flex; gap: 6px; }
+.tab {
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.answer-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+}
+.answer-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  min-width: 0;
+}
+.answer-cell.guessed { background: #fffbeb; border-color: #fcd34d; }
+.answer-cell.wrong { background: #fff1f2; border-color: #fca5a5; }
+.cell-no { font-size: 12px; color: var(--text-muted); line-height: 1; font-weight: 700; }
+.cell-answer { font-size: 22px; font-weight: 700; line-height: 1.3; }
+.cell-badges { display: flex; flex-direction: row; gap: 2px; min-height: 14px; }
+.badge-guess { font-size: 10px; color: #d97706; font-weight: 700; }
+.badge-wrong { font-size: 10px; color: #ef4444; font-weight: 700; }
 
 @media (max-width: 700px) {
   .summary-grid { grid-template-columns: 1fr 1fr; }
   .section-grid { grid-template-columns: 1fr; }
+  .answer-detail-grid { grid-template-columns: repeat(5, 1fr); }
 }
 </style>

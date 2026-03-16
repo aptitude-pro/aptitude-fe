@@ -1,6 +1,11 @@
 <template>
   <header class="app-header">
     <div class="header-left">
+      <button class="hamburger" @click="toggleSidebar" aria-label="메뉴">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
       <h1 class="page-title">{{ pageTitle }}</h1>
     </div>
     <div class="header-right">
@@ -19,12 +24,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
+
+const toggleSidebar = inject('toggleSidebar')
 
 const titleMap = {
   Dashboard: '대시보드',
@@ -115,4 +122,24 @@ const pageTitle = computed(() => titleMap[route.name] || '')
   transition: background 0.15s;
 }
 .btn-login:hover { background: var(--primary-hover); }
+
+.hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.hamburger:hover { background: var(--bg); }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 </style>

@@ -5,6 +5,8 @@ import apiClient from '@/api'
 export const useExamStore = defineStore('exam', () => {
   const session = ref(null)
   const answers = ref({})
+  const guesses = ref({})
+  const wrongs = ref({})
   const memoText = ref('')
   const memoCanvas = ref(null)
 
@@ -20,9 +22,17 @@ export const useExamStore = defineStore('exam', () => {
     delete answers.value[questionNo]
   }
 
+  function setGuess(questionNo) { guesses.value[questionNo] = true }
+  function clearGuess(questionNo) { delete guesses.value[questionNo] }
+
+  function setWrong(questionNo) { wrongs.value[questionNo] = true }
+  function clearWrong(questionNo) { delete wrongs.value[questionNo] }
+
   function resetAll() {
     session.value = null
     answers.value = {}
+    guesses.value = {}
+    wrongs.value = {}
     memoText.value = ''
     memoCanvas.value = null
   }
@@ -72,8 +82,8 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   return {
-    session, answers, memoText, memoCanvas,
-    setSession, setAnswer, clearAnswer, resetAll,
+    session, answers, guesses, wrongs, memoText, memoCanvas,
+    setSession, setAnswer, clearAnswer, setGuess, clearGuess, setWrong, clearWrong, resetAll,
     loadSession, saveAnswers, saveMemo, submitExam
   }
 })

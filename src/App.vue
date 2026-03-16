@@ -10,7 +10,8 @@
     <!-- 일반 레이아웃 (사이드바 포함) -->
     <template v-else>
       <Sidebar />
-      <div class="main-area">
+      <div v-if="sidebarOpen" class="mobile-overlay" @click="toggleSidebar" />
+      <div class="main-area" :class="{ 'sidebar-open': sidebarOpen }">
         <AppHeader />
         <main class="page-content">
           <router-view />
@@ -27,7 +28,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, provide, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar from '@/components/common/Sidebar.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -37,6 +38,11 @@ import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const authStore = useAuthStore()
+
+const sidebarOpen = ref(window.innerWidth > 768)
+function toggleSidebar() { sidebarOpen.value = !sidebarOpen.value }
+provide('sidebarOpen', sidebarOpen)
+provide('toggleSidebar', toggleSidebar)
 
 const today = new Date().toISOString().slice(0, 10)
 const showNotice = ref(localStorage.getItem('noticeHiddenDate') !== today)
@@ -68,11 +74,15 @@ onMounted(() => {
 }
 .main-area {
   flex: 1;
-  margin-left: var(--sidebar-width);
+  margin-left: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   overflow: hidden;
+  transition: margin-left 0.25s;
+}
+.main-area.sidebar-open {
+  margin-left: var(--sidebar-width);
 }
 .page-content {
   flex: 1;
@@ -85,5 +95,16 @@ onMounted(() => {
 
 .page-content > * {
   width: 100%;
+}
+
+@media (max-width: 768px) {
+  .main-area,
+  .main-area.sidebar-open { margin-left: 0; }
+  .mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
+  }
 }
 </style>

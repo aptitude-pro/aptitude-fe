@@ -307,6 +307,15 @@ function swReset() {
   overflow: hidden;
 }
 
+@media (max-width: 1100px) {
+  .timer-layout {
+    grid-template-columns: 340px 1fr;
+  }
+  .right-panel {
+    display: none;
+  }
+}
+
 .panel {
   display: flex;
   flex-direction: column;

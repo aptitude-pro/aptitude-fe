@@ -31,30 +31,46 @@
     <!-- 본문 3열 -->
     <div class="exam-body" :class="{ 'gsat-mode': examType === 'GSAT' }" ref="bodyRef">
       <!-- 좌: PDF 뷰어 -->
-      <div class="panel panel-pdf" :style="{ flex: panelWidths[0] }">
+      <div v-show="!isNarrow" class="panel panel-pdf" :style="{ flex: panelWidths[0] }">
         <PdfViewer />
       </div>
 
       <!-- 드래그 핸들 1 -->
-      <div class="divider" @mousedown="startDrag(0)" />
+      <div v-show="!isNarrow" class="divider" @mousedown="startDrag(0)" />
 
       <!-- 중: OMR 답안지 -->
       <div class="panel panel-omr">
         <OmrSheet
           :questionCount="questionCount"
           :answers="examStore.answers"
+          :guesses="examStore.guesses"
+          :wrongs="examStore.wrongs"
           :showUnansweredWarning="showSubmitDialog"
           @mark="handleMark"
           @clear="handleClear"
           @submit="showSubmitDialog = true"
+          @toggleGuess="(n) => examStore.guesses[n] ? examStore.clearGuess(n) : examStore.setGuess(n)"
+          @toggleWrong="(n) => examStore.wrongs[n] ? examStore.clearWrong(n) : examStore.setWrong(n)"
         />
       </div>
 
       <!-- 드래그 핸들 2 -->
-      <div class="divider" @mousedown="startDrag(1)" />
+      <div
+        class="divider divider-right"
+        :class="{ 'is-collapsed': !showToolPanel }"
+        @mousedown="showToolPanel ? startDrag(1) : null"
+        @click="!showToolPanel ? openToolPanel() : null"
+      >
+        <button class="panel-toggle-btn" @click.stop="toggleToolPanel" title="패널 열기/닫기">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline v-if="showToolPanel" points="15,18 9,12 15,6"/>
+            <polyline v-else points="9,18 15,12 9,6"/>
+          </svg>
+        </button>
+      </div>
 
       <!-- 우: 도구 패널 (GSAT는 메모장만) -->
-      <div class="panel panel-tools" :style="{ flex: panelWidths[2] }">
+      <div v-show="showToolPanel" class="panel panel-tools" :style="{ flex: panelWidths[2] }">
         <GsatMemoPanel
           v-if="examType === 'GSAT'"
           :memoText="examStore.memoText"
@@ -63,7 +79,7 @@
           :timerRunning="timerRunning"
           @update-memo="examStore.memoText = $event"
           @update-time-limit="handleTimeLimitUpdate"
-          @timer-start="timerRunning = true"
+          @timer-start="handleTimerStart"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
         />
@@ -76,7 +92,7 @@
           :timerRunning="timerRunning"
           @update-memo="examStore.memoText = $event"
           @update-time-limit="handleTimeLimitUpdate"
-          @timer-start="timerRunning = true"
+          @timer-start="handleTimerStart"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
         />
@@ -87,6 +103,10 @@
     <ScoreInputModal
       :visible="showScoreModal"
       :sessionId="sessionId"
+      :answers="examStore.answers"
+      :guesses="examStore.guesses"
+      :wrongs="examStore.wrongs"
+      :elapsedSeconds="timerElapsed"
       @saved="onScoreSaved"
       @close="showScoreModal = false"
     />
@@ -131,6 +151,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+const isNarrow = ref(window.innerWidth < 900)
+function onResize() { isNarrow.value = window.innerWidth < 900 }
 import { useRoute, useRouter } from 'vue-router'
 import { useExamStore } from '@/stores/exam'
 import ExamTimer from '@/components/exam/ExamTimer.vue'
@@ -153,11 +176,13 @@ const remainingSeconds = ref(0)
 const timerKey = ref(0)
 
 const timerRunning = ref(false)
+const timerEverStarted = ref(false)
 const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const submitting = ref(false)
 const panelWidths = ref(examType === 'GSAT' ? [3.5, 1, 1.5] : [3.5, 1, 1.5])
+const showToolPanel = ref(true)
 const bodyRef = ref(null)
 let draggingIdx = -1
 let startX = 0
@@ -177,6 +202,16 @@ const timerWarning = ref('')
 let warned5min = false
 let warned1min = false
 
+const timerElapsed = computed(() => {
+  if (!timerEverStarted.value || !totalSeconds.value) return null
+  return totalSeconds.value - remainingSeconds.value
+})
+
+function handleTimerStart() {
+  timerRunning.value = true
+  timerEverStarted.value = true
+}
+
 const answeredCount = computed(() => Object.keys(examStore.answers).length)
 const unansweredCount = computed(() => questionCount - answeredCount.value)
 
@@ -195,12 +230,14 @@ onMounted(async () => {
 
   window.addEventListener('mousemove', onDrag)
   window.addEventListener('mouseup', stopDrag)
+  window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
   if (saveTimer) clearInterval(saveTimer)
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', stopDrag)
+  window.removeEventListener('resize', onResize)
 })
 
 function onTick(remaining) {
@@ -318,7 +355,16 @@ function onDrag(e) {
 
   const newWidths = [...startWidths]
   newWidths[draggingIdx] = Math.max(0.5, startWidths[draggingIdx] + pct * 6)
-  newWidths[draggingIdx + 1] = Math.max(0.5, startWidths[draggingIdx + 1] - pct * 6)
+  const newRight = startWidths[draggingIdx + 1] - pct * 6
+
+  // 우측 패널 드래그 시: 임계값(0.3) 이하면 스냅해서 접기
+  if (draggingIdx === 1 && newRight < 0.3) {
+    showToolPanel.value = false
+    stopDrag()
+    return
+  }
+
+  newWidths[draggingIdx + 1] = Math.max(0.5, newRight)
   panelWidths.value = newWidths
 }
 
@@ -326,6 +372,18 @@ function stopDrag() {
   draggingIdx = -1
   document.body.style.cursor = ''
   document.body.style.userSelect = ''
+}
+
+function toggleToolPanel() {
+  if (showToolPanel.value) {
+    showToolPanel.value = false
+  } else {
+    openToolPanel()
+  }
+}
+
+function openToolPanel() {
+  showToolPanel.value = true
 }
 </script>
 
@@ -435,6 +493,44 @@ function stopDrag() {
 }
 .divider:hover { background: #9ca3af; }
 
+.divider-right {
+  position: relative;
+  width: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.divider-right.is-collapsed {
+  width: 12px;
+  background: #d1d5db;
+  cursor: pointer;
+}
+.divider-right.is-collapsed:hover { background: #9ca3af; }
+
+.panel-toggle-btn {
+  position: absolute;
+  width: 16px;
+  height: 32px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+  cursor: pointer;
+}
+.divider-right:hover .panel-toggle-btn,
+.divider-right.is-collapsed .panel-toggle-btn {
+  opacity: 1;
+}
+.panel-toggle-btn:hover {
+  background: #9ca3af;
+  color: #fff;
+}
+
 /* Dialog */
 .dialog-overlay {
   position: fixed;
@@ -464,4 +560,9 @@ function stopDrag() {
 .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
 .btn-danger { background: #ef4444; color: #fff; }
 .btn-danger:hover { background: #dc2626; }
+
+@media (max-width: 900px) {
+  .panel-omr { flex: 0 0 240px; }
+  .panel-tools { flex: 1; }
+}
 </style>

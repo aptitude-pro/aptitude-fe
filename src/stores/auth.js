@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('accessToken') || null)
   const showModal = ref(false)
   const modalTab = ref('login') // 'login' | 'register'
+  const pendingRedirectPath = ref(null)
 
   const isLoggedIn = computed(() => !!accessToken.value)
 
@@ -75,6 +76,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setPendingRedirect(path) {
+    pendingRedirectPath.value = path
+  }
+  function consumePendingRedirect() {
+    const p = pendingRedirectPath.value
+    pendingRedirectPath.value = null
+    return p
+  }
+
   async function logout() {
     try {
       await apiClient.post('/auth/logout')
@@ -85,6 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user, accessToken, isLoggedIn, showModal, modalTab,
     openModal, closeModal, login, register, logout, setAuth, clearAuth,
-    sendEmailCode, verifyEmailCode
+    sendEmailCode, verifyEmailCode,
+    setPendingRedirect, consumePendingRedirect
   }
 })

@@ -67,6 +67,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    auth.setPendingRedirect(to.fullPath)
     auth.openModal('login')
     return false
   }

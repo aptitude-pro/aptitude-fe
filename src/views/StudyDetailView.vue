@@ -373,4 +373,11 @@ function formatDate(d) {
 .mb-count { font-size: 12px; font-weight: 600; width: 32px; text-align: right; color: var(--text-muted); }
 
 .chart-wrap { min-height: 200px; display: flex; align-items: center; justify-content: center; }
+
+@media (max-width: 768px) {
+  .page-header { flex-wrap: wrap; }
+  .tabs { overflow-x: auto; }
+  .tab { padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+  .modal { width: calc(100vw - 32px); }
+}
 </style>

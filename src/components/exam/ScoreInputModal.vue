@@ -10,14 +10,9 @@
       <div class="meta-section">
         <div class="meta-row">
           <label class="meta-label">응시 년도</label>
-          <div class="meta-options">
-            <button
-              v-for="y in YEARS"
-              :key="y"
-              :class="['meta-btn', { active: selectedYear === y }]"
-              @click="selectedYear = y"
-            >{{ y }}</button>
-          </div>
+          <select v-model="selectedYear" class="meta-select">
+            <option v-for="y in YEARS" :key="y" :value="y">{{ y }}년</option>
+          </select>
         </div>
 
         <div class="meta-row">
@@ -52,13 +47,15 @@
 
         <div class="meta-row">
           <label class="meta-label">회차</label>
-          <div class="meta-options">
-            <button
-              v-for="r in ROUNDS"
-              :key="r"
-              :class="['meta-btn', { active: selectedRound === r }]"
-              @click="selectedRound = selectedRound === r ? null : r"
-            >{{ r }}</button>
+          <div class="round-input-wrap">
+            <input
+              type="number"
+              min="1"
+              v-model.number="selectedRound"
+              class="round-input"
+              placeholder="회차"
+            />
+            <span class="unit">회</span>
           </div>
         </div>
       </div>
@@ -90,7 +87,7 @@
       <div class="modal-actions">
         <button class="btn-cancel" @click="$emit('close')">취소</button>
         <button class="btn-submit" @click="handleSubmit" :disabled="submitting">
-          {{ submitting ? '저장 중...' : '제출하기' }}
+          {{ submitting ? '저장 중...' : authStore.isLoggedIn ? '제출하기' : '로그인하여 저장' }}
         </button>
       </div>
 
@@ -106,7 +103,11 @@ import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   visible: Boolean,
-  sessionId: { type: [String, Number], default: null }
+  sessionId: { type: [String, Number], default: null },
+  answers:  { type: Object, default: () => ({}) },
+  guesses:  { type: Object, default: () => ({}) },
+  wrongs:   { type: Object, default: () => ({}) },
+  elapsedSeconds: { type: Number, default: null }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -114,19 +115,32 @@ const resultStore = useResultStore()
 const authStore = useAuthStore()
 
 const CATEGORIES = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
-const YEARS = [2023, 2024, 2025, 2026]
+const YEARS = Array.from({ length: 7 }, (_, i) => 2020 + i)
 const PERIODS = ['상반기', '하반기']
 const PLATFORMS = ['해커스', '링커리어', '인크루트', '에듀윌', '기타']
-const ROUNDS = ['1회', '2회', '3회', '4회', '5회']
 
 const scores = ref(Object.fromEntries(CATEGORIES.map(c => [c, null])))
 const selectedYear = ref(new Date().getFullYear())
 const selectedPeriod = ref('상반기')
 const selectedPlatform = ref('해커스')
 const customPlatform = ref('')
-const selectedRound = ref(null)
+const selectedRound = ref(null)  // number | null
 const submitting = ref(false)
 const errorMsg = ref('')
+
+function buildQuestions() {
+  const allNos = new Set([
+    ...Object.keys(props.answers).map(Number),
+    ...Object.keys(props.guesses).filter(k => props.guesses[k]).map(Number),
+    ...Object.keys(props.wrongs).filter(k => props.wrongs[k]).map(Number)
+  ])
+  return [...allNos].sort((a, b) => a - b).map(no => ({
+    questionNo: no,
+    selectedAnswer: props.answers[no] ?? null,
+    isGuessed: !!props.guesses[no],
+    isWrong: !!props.wrongs[no]
+  }))
+}
 
 const totalScore = computed(() => {
   const vals = CATEGORIES.map(c => scores.value[c]).filter(v => v !== null && v !== '')
@@ -152,7 +166,15 @@ async function handleSubmit() {
   }
 
   if (!authStore.isLoggedIn) {
-    emit('saved', { ...scores.value })
+    sessionStorage.setItem('pendingManualResult', JSON.stringify({
+      scores: { ...scores.value },
+      examYear: selectedYear.value,
+      examPeriod: selectedPeriod.value,
+      platform: effectivePlatform.value,
+      examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
+      questions: buildQuestions()
+    }))
+    authStore.openModal('login')
     return
   }
 
@@ -161,7 +183,9 @@ async function handleSubmit() {
     examYear: selectedYear.value,
     examPeriod: selectedPeriod.value,
     platform: effectivePlatform.value,
-    examRound: selectedRound.value
+    examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
+    elapsedSeconds: props.elapsedSeconds,
+    questions: buildQuestions()
   })
   submitting.value = false
 
@@ -241,6 +265,29 @@ async function handleSubmit() {
   width: 90px;
 }
 .platform-input:focus { border-color: #4f46e5; }
+
+.meta-select {
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.meta-select:focus { border-color: #4f46e5; }
+
+.round-input-wrap { display: flex; align-items: center; gap: 6px; }
+.round-input {
+  width: 80px;
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+.round-input:focus { border-color: #4f46e5; }
 
 .divider-line {
   border-top: 1px solid #e5e7eb;

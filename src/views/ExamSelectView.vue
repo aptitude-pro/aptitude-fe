@@ -90,7 +90,7 @@ const examTypes = [
     name: 'SKCT',
     fullName: 'SK그룹 종합역량검사',
     description: '언어이해, 수리논리, 추리, 시공간 영역 평가',
-    timeLimit: 60,
+    timeLimit: 75,
     questionCount: 100,
     available: true
   },

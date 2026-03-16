@@ -70,7 +70,9 @@ export const useResultStore = defineStore('result', () => {
         examYear: meta.examYear,
         examPeriod: meta.examPeriod,
         platform: meta.platform,
-        examRound: meta.examRound ?? null
+        examRound: meta.examRound ?? null,
+        elapsedSeconds: (meta.elapsedSeconds > 0) ? meta.elapsedSeconds : null,
+        questions: meta.questions ?? []
       })
       return { success: true, resultId: res.data.data.id }
     } catch (_) {
