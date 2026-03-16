@@ -136,7 +136,7 @@ function getImageData() {
   return canvasRef.value.toDataURL()
 }
 
-defineExpose({ getImageData, clearCanvas })
+defineExpose({ getImageData, clearCanvas, resize })
 </script>
 
 <style scoped>

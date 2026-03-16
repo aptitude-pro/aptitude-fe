@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import DrawingBoard from './DrawingBoard.vue'
 import Calculator from './Calculator.vue'
 
@@ -112,6 +112,13 @@ function resetTimer() {
 function clearMemo() {
   emit('update-memo', '')
 }
+
+watch(activeTab, async (tab) => {
+  if (tab === 'draw') {
+    await nextTick()
+    drawRef.value?.resize()
+  }
+})
 
 onMounted(() => {
   emit('update-time-limit', localMinutes.value)
