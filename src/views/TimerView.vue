@@ -343,6 +343,7 @@ function swReset() {
 
 .panel-body--fill {
   padding: 0;
+  align-items: stretch;
 }
 
 /* 탭 버튼 */
