@@ -116,7 +116,9 @@ function clearMemo() {
 watch(activeTab, async (tab) => {
   if (tab === 'draw') {
     await nextTick()
-    drawRef.value?.resize()
+    requestAnimationFrame(() => {
+      drawRef.value?.resize()
+    })
   }
 })
 
