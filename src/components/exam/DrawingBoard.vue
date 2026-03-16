@@ -55,16 +55,18 @@ let drawing = false
 let ctx = null
 let lastX = 0
 let lastY = 0
+let resizeObserver = null
 
 onMounted(async () => {
   await nextTick()
   const canvas = canvasRef.value
   ctx = canvas.getContext('2d')
   resize()
-  window.addEventListener('resize', resize)
+  resizeObserver = new ResizeObserver(resize)
+  resizeObserver.observe(canvas)
 })
 
-onUnmounted(() => window.removeEventListener('resize', resize))
+onUnmounted(() => resizeObserver?.disconnect())
 
 function resize() {
   const canvas = canvasRef.value
@@ -79,8 +81,14 @@ function resize() {
 }
 
 function getPos(e) {
-  const rect = canvasRef.value.getBoundingClientRect()
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  const canvas = canvasRef.value
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  }
 }
 
 function startDraw(e) {
@@ -189,5 +197,6 @@ defineExpose({ getImageData, clearCanvas })
   flex: 1;
   cursor: crosshair;
   display: block;
+  width: 100%;
 }
 </style>
