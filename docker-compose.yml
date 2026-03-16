@@ -6,12 +6,19 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: aptitude-frontend
-    ports:
-      - "3000:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`aptitude-pro.shop`)"
+      - "traefik.http.routers.frontend.entrypoints=http"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
     networks:
       - aptitude-net
+      - coolify
 
 networks:
   aptitude-net:
     external: true
     name: aptitude-net
+  coolify:
+    external: true
+    name: coolify
