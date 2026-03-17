@@ -18,9 +18,13 @@
         />
       </div>
       <div class="header-right">
-        <button class="btn-submit-exam" @click="showSubmitDialog = true">
+        <button v-if="!isStudyMode" class="btn-submit-exam" @click="showSubmitDialog = true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
           제출하기
+        </button>
+        <button v-else class="btn-submit-exam study" @click="handleStudyComplete">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+          완료
         </button>
       </div>
     </header>
@@ -39,7 +43,7 @@
       <div v-show="!isNarrow" class="divider" @mousedown="startDrag(0)" />
 
       <!-- 중: OMR 답안지 -->
-      <div class="panel panel-omr">
+      <div class="panel panel-omr" :style="{ flex: panelWidths[1] }">
         <OmrSheet
           :questionCount="questionCount"
           :answers="examStore.answers"
@@ -49,6 +53,7 @@
           @mark="handleMark"
           @clear="handleClear"
           @submit="showSubmitDialog = true"
+          @save="handleSave"
           @toggleGuess="(n) => examStore.guesses[n] ? examStore.clearGuess(n) : examStore.setGuess(n)"
           @toggleWrong="(n) => examStore.wrongs[n] ? examStore.clearWrong(n) : examStore.setWrong(n)"
         />
@@ -115,13 +120,13 @@
     <div v-if="showExitDialog" class="dialog-overlay">
       <div class="dialog">
         <h3>시험을 나가시겠습니까?</h3>
-        <p>저장하고 나가면 현재까지의 답안과 점수가 저장됩니다.</p>
+        <p>저장하고 나가면 현재까지의 답안이 저장됩니다.</p>
         <div class="dialog-actions">
-          <button class="btn-secondary" @click="showExitDialog = false">계속 풀기</button>
-          <button class="btn-danger" @click="exitWithoutSave">그냥 나가기</button>
           <button class="btn-primary" @click="exitWithSave" :disabled="submitting">
             {{ submitting ? '저장 중...' : '저장하고 나가기' }}
           </button>
+          <button class="btn-danger" @click="exitWithoutSave">그냥 나가기</button>
+          <button class="btn-secondary" @click="showExitDialog = false">계속 풀기</button>
         </div>
       </div>
     </div>
@@ -139,10 +144,10 @@
         </p>
         <p class="dialog-hint">제출 후에는 답안을 수정할 수 없습니다.</p>
         <div class="dialog-actions">
-          <button class="btn-secondary" @click="showSubmitDialog = false">취소</button>
           <button class="btn-primary" @click="handleSubmit" :disabled="submitting">
             {{ submitting ? '제출 중...' : '최종 제출' }}
           </button>
+          <button class="btn-secondary" @click="showSubmitDialog = false">취소</button>
         </div>
       </div>
     </div>
@@ -171,6 +176,41 @@ const sessionId = route.params.sessionId
 const examName = route.query.examName || 'SKCT 시험'
 const examType = route.query.examType || ''
 const questionCount = parseInt(route.query.questionCount) || 40
+const isStudyMode = computed(() => route.query.mode === 'study')
+const isLocalSession = sessionId.startsWith('local-') || sessionId.startsWith('study-')
+
+// localStorage 헬퍼
+function saveLocalSessionData() {
+  const data = {
+    answers: { ...examStore.answers },
+    guesses: { ...examStore.guesses },
+    wrongs: { ...examStore.wrongs },
+    memoText: examStore.memoText
+  }
+  localStorage.setItem(`skct_session_data_${sessionId}`, JSON.stringify(data))
+}
+
+function saveSessionToLocalStorage() {
+  const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]')
+  const idx = sessions.findIndex(s => s.sessionId === sessionId)
+  const entry = {
+    sessionId,
+    examName,
+    examType,
+    questionCount,
+    mode: isStudyMode.value ? 'study' : 'exam',
+    savedAt: new Date().toISOString()
+  }
+  if (idx >= 0) sessions[idx] = entry
+  else sessions.unshift(entry)
+  localStorage.setItem('skct_sessions', JSON.stringify(sessions))
+}
+
+function removeSessionFromLocalStorage() {
+  const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]')
+  localStorage.setItem('skct_sessions', JSON.stringify(sessions.filter(s => s.sessionId !== sessionId)))
+  localStorage.removeItem(`skct_session_data_${sessionId}`)
+}
 const totalSeconds = ref(0)
 const remainingSeconds = ref(0)
 const timerKey = ref(0)
@@ -181,7 +221,7 @@ const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const submitting = ref(false)
-const panelWidths = ref(examType === 'GSAT' ? [3.5, 1, 1.5] : [3.5, 1, 1.5])
+const panelWidths = ref(examType === 'GSAT' ? [3, 1.5, 1.5] : [3, 1.5, 1.5])
 const showToolPanel = ref(true)
 const bodyRef = ref(null)
 let draggingIdx = -1
@@ -217,14 +257,38 @@ const unansweredCount = computed(() => questionCount - answeredCount.value)
 
 onMounted(async () => {
   examStore.resetAll()
-  if (!sessionId.startsWith('local-')) {
+  if (!isLocalSession) {
     await examStore.loadSession(sessionId)
+  } else {
+    // 1. localStorage 저장 답안 복원 (이어하기)
+    const stored = localStorage.getItem(`skct_session_data_${sessionId}`)
+    if (stored) {
+      try {
+        const data = JSON.parse(stored)
+        if (data.answers) Object.entries(data.answers).forEach(([k, v]) => examStore.setAnswer(parseInt(k), v))
+        if (data.guesses) Object.keys(data.guesses).forEach(k => examStore.setGuess(parseInt(k)))
+        if (data.wrongs) Object.keys(data.wrongs).forEach(k => examStore.setWrong(parseInt(k)))
+        if (data.memoText) examStore.memoText = data.memoText
+      } catch (_) {}
+    }
+
+    // 2. prevAnswers query param 복원 (다시 풀기) — localStorage 복원 이후 덮어씀
+    if (route.query.prevAnswers) {
+      try {
+        const prev = JSON.parse(route.query.prevAnswers)
+        Object.entries(prev).forEach(([k, v]) => examStore.setAnswer(parseInt(k), v))
+      } catch (_) {}
+    }
+
+    saveSessionToLocalStorage()
   }
 
   // 30초마다 자동저장
   saveTimer = setInterval(() => {
-    if (!sessionId.startsWith('local-')) {
+    if (!isLocalSession) {
       examStore.saveAnswers(sessionId)
+    } else {
+      saveLocalSessionData()
     }
   }, 30000)
 
@@ -273,7 +337,12 @@ function handleTimerReset() {
 
 async function onTimeExpired() {
   timerRunning.value = false
-  await handleSubmit(true)
+  if (isStudyMode.value) {
+    timerWarning.value = '⏱ 시간이 종료되었습니다. 계속 학습하거나 완료하세요.'
+    setTimeout(() => { timerWarning.value = '' }, 10000)
+  } else {
+    await handleSubmit(true)
+  }
 }
 
 function handleMark(questionNo, answer) {
@@ -285,31 +354,40 @@ function handleMark(questionNo, answer) {
 
 function handleClear(questionNo) {
   examStore.clearAnswer(questionNo)
+  if (!isLocalSession) {
+    examStore.saveAnswers(sessionId)
+  } else {
+    saveLocalSessionData()
+  }
 }
 
 async function handleSubmit(auto = false) {
   if (submitting.value) return
+  submitting.value = true
   showSubmitDialog.value = false
   timerRunning.value = false
 
   // SKCT는 로컬/서버 무관하게 항상 수동 채점 모달
   if (examType === 'SKCT') {
     showScoreModal.value = true
+    submitting.value = false
     return
   }
 
   // 서버 세션 (비-SKCT): 자동채점
-  if (!sessionId.startsWith('local-')) {
+  if (!isLocalSession) {
     submitting.value = true
     const result = await examStore.submitExam(sessionId)
     submitting.value = false
     if (result.success) {
+      removeSessionFromLocalStorage()
       router.push(`/results/${result.data.id}`)
       return
     }
   }
 
   // 로컬 세션 (비-SKCT): 답안 전달
+  removeSessionFromLocalStorage()
   router.push({
     name: 'ResultDetail',
     params: { id: 'local' },
@@ -318,6 +396,7 @@ async function handleSubmit(auto = false) {
 }
 
 function onScoreSaved(resultIdOrScores) {
+  removeSessionFromLocalStorage()
   if (typeof resultIdOrScores === 'number') {
     router.push(`/results/${resultIdOrScores}`)
   } else {
@@ -333,9 +412,30 @@ function exitWithoutSave() {
   router.push('/exam')
 }
 
+async function handleSave() {
+  if (!isLocalSession) {
+    await examStore.saveAnswers(sessionId)
+  } else {
+    saveLocalSessionData()
+    saveSessionToLocalStorage()
+  }
+  router.push('/exam')
+}
+
 async function exitWithSave() {
-  await handleSubmit()
-  showExitDialog.value = false
+  if (!isLocalSession) {
+    await examStore.saveAnswers(sessionId)
+  } else {
+    saveLocalSessionData()
+    saveSessionToLocalStorage()
+  }
+  router.push('/exam')
+}
+
+function handleStudyComplete() {
+  saveLocalSessionData()
+  removeSessionFromLocalStorage()
+  router.push('/exam')
 }
 
 // 패널 드래그
@@ -442,6 +542,8 @@ function openToolPanel() {
   transition: background 0.15s;
 }
 .btn-submit-exam:hover { background: #4338ca; }
+.btn-submit-exam.study { background: #059669; }
+.btn-submit-exam.study:hover { background: #047857; }
 
 .timer-warning-banner {
   background: #fef3c7;
@@ -474,8 +576,6 @@ function openToolPanel() {
 
 .panel-omr {
   display: flex;
-  flex: 0 0 220px;
-  width: 220px;
 }
 
 .panel-omr > * {
@@ -562,7 +662,6 @@ function openToolPanel() {
 .btn-danger:hover { background: #dc2626; }
 
 @media (max-width: 900px) {
-  .panel-omr { flex: 0 0 240px; }
   .panel-tools { flex: 1; }
 }
 </style>

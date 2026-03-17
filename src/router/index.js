@@ -29,8 +29,7 @@ const router = createRouter({
     {
       path: '/results/:id',
       name: 'ResultDetail',
-      component: () => import('@/views/ResultView.vue'),
-      meta: { requiresAuth: true }
+      component: () => import('@/views/ResultView.vue')
     },
     {
       path: '/my/results',

@@ -81,9 +81,18 @@ export const useExamStore = defineStore('exam', () => {
     }
   }
 
+  async function deleteSession(sessionId) {
+    try {
+      await apiClient.delete(`/sessions/${sessionId}`)
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
   return {
     session, answers, guesses, wrongs, memoText, memoCanvas,
     setSession, setAnswer, clearAnswer, setGuess, clearGuess, setWrong, clearWrong, resetAll,
-    loadSession, saveAnswers, saveMemo, submitExam
+    loadSession, saveAnswers, saveMemo, submitExam, deleteSession
   }
 })

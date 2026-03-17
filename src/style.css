@@ -39,6 +39,7 @@ button {
   border: none;
   font-family: inherit;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 input, textarea, select {
@@ -126,6 +127,12 @@ a {
   border-radius: 100px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.type-badge,
+.chip {
+  white-space: nowrap;
 }
 .badge-blue { background: #dbeafe; color: #1d4ed8; }
 .badge-green { background: #d1fae5; color: #065f46; }

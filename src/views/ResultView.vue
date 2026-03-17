@@ -3,6 +3,7 @@
     <div class="page-header">
       <router-link to="/my/results" class="back-btn">← 목록으로</router-link>
       <h2>결과 확인</h2>
+      <button v-if="!loading" class="btn-retry" @click="retryExam">다시 풀기</button>
     </div>
 
     <div v-if="loading" class="loading">결과를 불러오는 중...</div>
@@ -96,6 +97,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 const EXAM_QUESTION_COUNT = { SKCT: 100, GSAT: 50, NCS: 50 }
 const SKCT_CATEGORY_ORDER = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
@@ -117,6 +119,7 @@ import { useExamStore } from '@/stores/exam'
 import CategoryRadarChart from '@/components/dashboard/CategoryRadarChart.vue'
 
 const route = useRoute()
+const router = useRouter()
 const resultStore = useResultStore()
 const examStore = useExamStore()
 const loading = ref(true)
@@ -248,6 +251,33 @@ const filteredAnswers = computed(() => {
   return overlaidAnswers.value
 })
 
+function retryExam() {
+  const newSessionId = `local-${Date.now()}`
+  const examType = result.value?.examType || route.query.examType || 'SKCT'
+  const examNameVal = result.value?.examTitle || route.query.examName || examType
+  const qCount = questionCount.value
+
+  let prevAnswers = {}
+  if (result.value?.answers?.length) {
+    result.value.answers.forEach(a => {
+      if (a.selectedAnswer != null) prevAnswers[a.questionNo] = a.selectedAnswer
+    })
+  } else if (route.query.answers) {
+    try { prevAnswers = JSON.parse(route.query.answers) } catch (_) {}
+  }
+
+  router.push({
+    name: 'ExamSession',
+    params: { sessionId: newSessionId },
+    query: {
+      examType,
+      questionCount: qCount,
+      examName: examNameVal,
+      prevAnswers: JSON.stringify(prevAnswers)
+    }
+  })
+}
+
 function circleNum(n) {
   return ['①','②','③','④','⑤'][n - 1] ?? n
 }
@@ -260,7 +290,17 @@ function circleNum(n) {
 .page-header { display: flex; align-items: center; gap: 12px; }
 .back-btn { font-size: 13px; color: var(--text-muted); }
 .back-btn:hover { color: var(--primary); }
-.page-header h2 { font-size: 22px; font-weight: 700; }
+.page-header h2 { font-size: 22px; font-weight: 700; flex: 1; }
+.btn-retry {
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-retry:hover { background: var(--primary-hover); }
 
 .loading { padding: 40px; text-align: center; color: var(--text-muted); }
 

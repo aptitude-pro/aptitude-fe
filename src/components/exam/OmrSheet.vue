@@ -3,7 +3,7 @@
     <div class="omr-header">
       <span class="panel-label">OMR 답안지</span>
       <div class="omr-actions">
-        <button class="omr-btn score" @click="$emit('submit')">채점하기</button>
+        <button class="omr-btn save" @click="$emit('save')">임시저장</button>
         <button class="omr-btn reset" @click="confirmReset">답안 초기화</button>
       </div>
     </div>
@@ -56,7 +56,7 @@ const props = defineProps({
   wrongs: { type: Object, default: () => ({}) },
   showUnansweredWarning: { type: Boolean, default: false }
 })
-const emit = defineEmits(['mark', 'clear', 'submit', 'toggleGuess', 'toggleWrong'])
+const emit = defineEmits(['mark', 'clear', 'submit', 'save', 'toggleGuess', 'toggleWrong'])
 
 const answeredCount = computed(() => Object.keys(props.answers).length)
 
@@ -108,13 +108,14 @@ function confirmReset() {
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
   transition: all 0.15s;
 }
-.omr-btn.score {
+.omr-btn.save {
   background: #1f2937;
   color: #fff;
 }
-.omr-btn.score:hover { background: #111827; }
+.omr-btn.save:hover { background: #111827; }
 .omr-btn.reset {
   background: #f3f4f6;
   color: #374151;
