@@ -14,7 +14,16 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-dot"></span>
         </button>
-        <div class="user-avatar">{{ auth.user?.nickname?.charAt(0) || 'U' }}</div>
+        <div class="user-menu" ref="menuRef">
+          <div class="user-avatar" @click="dropdownOpen = !dropdownOpen">
+            {{ auth.user?.nickname || 'User' }}
+          </div>
+          <div v-if="dropdownOpen" class="user-dropdown">
+            <div class="dropdown-name">{{ auth.user?.nickname }}</div>
+            <router-link to="/my/profile" class="dropdown-item" @click="dropdownOpen = false">마이페이지</router-link>
+            <button class="dropdown-item logout" @click="handleLogout">로그아웃</button>
+          </div>
+        </div>
       </template>
       <template v-else>
         <button class="btn-login" @click="auth.openModal('login')">로그인</button>
@@ -24,14 +33,32 @@
 </template>
 
 <script setup>
-import { computed, inject } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted, onUnmounted, inject } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 
 const toggleSidebar = inject('toggleSidebar')
+
+const dropdownOpen = ref(false)
+const menuRef = ref(null)
+
+function handleClickOutside(e) {
+  if (menuRef.value && !menuRef.value.contains(e.target)) {
+    dropdownOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', handleClickOutside))
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
+
+async function handleLogout() {
+  dropdownOpen.value = false
+  await auth.logout()
+  router.push('/exam')
+}
 
 const titleMap = {
   Dashboard: '대시보드',
@@ -99,9 +126,9 @@ const pageTitle = computed(() => titleMap[route.name] || '')
 }
 
 .user-avatar {
-  width: 34px;
   height: 34px;
-  border-radius: 50%;
+  padding: 0 14px;
+  border-radius: 17px;
   background: var(--primary);
   color: #fff;
   display: flex;
@@ -111,6 +138,45 @@ const pageTitle = computed(() => titleMap[route.name] || '')
   font-weight: 700;
   cursor: pointer;
 }
+
+.user-menu {
+  position: relative;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  min-width: 160px;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.dropdown-name {
+  padding: 12px 16px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+.dropdown-item:hover { background: var(--bg); }
+.dropdown-item.logout { color: #ef4444; }
 
 .btn-login {
   background: var(--primary);

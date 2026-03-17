@@ -16,6 +16,7 @@
               class="btn-primary" @click="handleJoinPublic" :disabled="joinLoading">
         {{ joinLoading ? '참가 중...' : '참가하기' }}
       </button>
+      <button v-if="study && study.myRole === 'LEADER'" class="btn-danger" @click="handleDelete">삭제</button>
       <button v-if="study && study.myRole && study.myRole !== 'LEADER'" class="btn-danger" @click="handleLeave">탈퇴</button>
     </div>
 
@@ -228,6 +229,16 @@ function copyCode() {
   navigator.clipboard.writeText(study.value.inviteCode)
   codeCopied.value = true
   setTimeout(() => { codeCopied.value = false }, 2000)
+}
+
+async function handleDelete() {
+  if (!confirm('스터디를 삭제하시겠습니까? 모든 멤버와 공지가 삭제됩니다.')) return
+  const result = await studyStore.deleteStudy(route.params.id)
+  if (result.success) {
+    router.push('/studies')
+  } else {
+    alert(result.message)
+  }
 }
 
 async function handleLeave() {

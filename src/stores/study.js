@@ -99,9 +99,19 @@ export const useStudyStore = defineStore('study', () => {
     }
   }
 
+  async function deleteStudy(id) {
+    try {
+      await apiClient.delete(`/studies/${id}`)
+      myStudies.value = myStudies.value.filter(s => s.id !== id)
+      return { success: true }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '삭제에 실패했습니다.' }
+    }
+  }
+
   return {
     myStudies, publicStudies, currentStudy, ranking, dashboard,
     fetchMyStudies, fetchPublicStudies, fetchStudy, fetchRanking,
-    createStudy, joinStudy, joinPublicStudyById, leaveStudy, fetchDashboard
+    createStudy, joinStudy, joinPublicStudyById, leaveStudy, fetchDashboard, deleteStudy
   }
 })
