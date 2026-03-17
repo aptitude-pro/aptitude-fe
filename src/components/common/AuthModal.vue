@@ -138,7 +138,8 @@ async function afterAuth() {
     const { scores, ...meta } = JSON.parse(raw)
     const saved = await resultStore.saveManualResult(null, scores, meta)
     if (saved.success) {
-      router.push(`/results/${saved.resultId}`)
+      const query = meta.isDraft ? { isDraft: 'true' } : {}
+      router.push({ path: `/results/${saved.resultId}`, query })
       return
     }
   }

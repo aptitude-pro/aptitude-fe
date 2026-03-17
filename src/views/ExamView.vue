@@ -112,6 +112,7 @@
       :guesses="examStore.guesses"
       :wrongs="examStore.wrongs"
       :elapsedSeconds="timerElapsed"
+      :isDraft="saveMode === 'draft'"
       @saved="onScoreSaved"
       @close="showScoreModal = false"
     />
@@ -220,6 +221,7 @@ const timerEverStarted = ref(false)
 const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
+const saveMode = ref('submit') // 'submit' | 'draft'
 const submitting = ref(false)
 const panelWidths = ref(examType === 'GSAT' ? [3, 1.5, 1.5] : [3, 1.5, 1.5])
 const showToolPanel = ref(true)
@@ -369,6 +371,7 @@ async function handleSubmit(auto = false) {
 
   // SKCT는 로컬/서버 무관하게 항상 수동 채점 모달
   if (examType === 'SKCT') {
+    saveMode.value = 'submit'
     showScoreModal.value = true
     submitting.value = false
     return
@@ -395,15 +398,15 @@ async function handleSubmit(auto = false) {
   })
 }
 
-function onScoreSaved(resultIdOrScores) {
+function onScoreSaved({ resultId, isDraft } = {}) {
   removeSessionFromLocalStorage()
-  if (typeof resultIdOrScores === 'number') {
-    router.push(`/results/${resultIdOrScores}`)
+  if (typeof resultId === 'number') {
+    router.push({ path: `/results/${resultId}`, query: isDraft ? { isDraft: 'true' } : {} })
   } else {
     router.push({
       name: 'ResultDetail',
       params: { id: 'local' },
-      query: { categoryScores: JSON.stringify(resultIdOrScores), examName }
+      query: { categoryScores: JSON.stringify(resultId), examName }
     })
   }
 }
@@ -419,7 +422,12 @@ async function handleSave() {
     saveLocalSessionData()
     saveSessionToLocalStorage()
   }
-  router.push('/exam')
+  if (examType === 'SKCT') {
+    saveMode.value = 'draft'
+    showScoreModal.value = true
+  } else {
+    router.push('/exam')
+  }
 }
 
 async function exitWithSave() {

@@ -2,8 +2,8 @@
   <div v-if="visible" class="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <h3>채점 결과 입력</h3>
-        <p>응시 정보와 분야별 점수를 입력하세요 (0~20)</p>
+        <h3>{{ isDraft ? '임시저장' : '채점 결과 입력' }}</h3>
+        <p>{{ isDraft ? '응시 정보를 입력하세요' : '응시 정보와 분야별 점수를 입력하세요 (0~20)' }}</p>
       </div>
 
       <!-- 메타데이터 입력 -->
@@ -60,34 +60,36 @@
         </div>
       </div>
 
-      <div class="divider-line" />
+      <template v-if="!isDraft">
+        <div class="divider-line" />
 
-      <div class="score-fields">
-        <div v-for="cat in CATEGORIES" :key="cat" class="score-row">
-          <label class="cat-label">{{ cat }}</label>
-          <div class="score-input-wrap">
-            <input
-              type="number"
-              min="0"
-              max="20"
-              v-model.number="scores[cat]"
-              class="score-input"
-              placeholder="0"
-            />
-            <span class="unit">점</span>
+        <div class="score-fields">
+          <div v-for="cat in CATEGORIES" :key="cat" class="score-row">
+            <label class="cat-label">{{ cat }}</label>
+            <div class="score-input-wrap">
+              <input
+                type="number"
+                min="0"
+                max="20"
+                v-model.number="scores[cat]"
+                class="score-input"
+                placeholder="0"
+              />
+              <span class="unit">점</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="total-row">
-        <span class="total-label">총점</span>
-        <span class="total-value">{{ totalScore }}점</span>
-      </div>
+        <div class="total-row">
+          <span class="total-label">총점</span>
+          <span class="total-value">{{ totalScore }}점</span>
+        </div>
+      </template>
 
       <div class="modal-actions">
         <button class="btn-cancel" @click="$emit('close')">취소</button>
         <button class="btn-submit" @click="handleSubmit" :disabled="submitting">
-          {{ submitting ? '저장 중...' : authStore.isLoggedIn ? '제출하기' : '로그인하여 저장' }}
+          {{ submitting ? '저장 중...' : authStore.isLoggedIn ? (isDraft ? '임시저장' : '제출하기') : '로그인하여 저장' }}
         </button>
       </div>
 
@@ -107,7 +109,8 @@ const props = defineProps({
   answers:  { type: Object, default: () => ({}) },
   guesses:  { type: Object, default: () => ({}) },
   wrongs:   { type: Object, default: () => ({}) },
-  elapsedSeconds: { type: Number, default: null }
+  elapsedSeconds: { type: Number, default: null },
+  isDraft: { type: Boolean, default: false }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -154,43 +157,52 @@ const effectivePlatform = computed(() =>
 
 async function handleSubmit() {
   errorMsg.value = ''
-  const filled = CATEGORIES.filter(c => scores.value[c] !== null && scores.value[c] !== '')
-  if (filled.length < CATEGORIES.length) {
-    errorMsg.value = '모든 분야의 점수를 입력해주세요.'
-    return
+
+  if (!props.isDraft) {
+    const filled = CATEGORIES.filter(c => scores.value[c] !== null && scores.value[c] !== '')
+    if (filled.length < CATEGORIES.length) {
+      errorMsg.value = '모든 분야의 점수를 입력해주세요.'
+      return
+    }
+    const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
+    if (invalid) {
+      errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
+      return
+    }
   }
-  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
-  if (invalid) {
-    errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
-    return
-  }
+
+  const draftScores = props.isDraft
+    ? Object.fromEntries(CATEGORIES.map(c => [c, 0]))
+    : { ...scores.value }
 
   if (!authStore.isLoggedIn) {
     sessionStorage.setItem('pendingManualResult', JSON.stringify({
-      scores: { ...scores.value },
+      scores: draftScores,
       examYear: selectedYear.value,
       examPeriod: selectedPeriod.value,
       platform: effectivePlatform.value,
       examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
-      questions: buildQuestions()
+      questions: buildQuestions(),
+      isDraft: props.isDraft
     }))
     authStore.openModal('login')
     return
   }
 
   submitting.value = true
-  const result = await resultStore.saveManualResult(props.sessionId, scores.value, {
+  const result = await resultStore.saveManualResult(props.sessionId, draftScores, {
     examYear: selectedYear.value,
     examPeriod: selectedPeriod.value,
     platform: effectivePlatform.value,
     examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
     elapsedSeconds: props.elapsedSeconds,
-    questions: buildQuestions()
+    questions: buildQuestions(),
+    isDraft: props.isDraft
   })
   submitting.value = false
 
   if (result.success) {
-    emit('saved', result.resultId)
+    emit('saved', { resultId: result.resultId, isDraft: props.isDraft })
   } else {
     errorMsg.value = '저장에 실패했습니다. 다시 시도해주세요.'
   }

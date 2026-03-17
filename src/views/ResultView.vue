@@ -3,7 +3,11 @@
     <div class="page-header">
       <router-link to="/my/results" class="back-btn">← 목록으로</router-link>
       <h2>결과 확인</h2>
-      <button v-if="!loading" class="btn-retry" @click="retryExam">다시 풀기</button>
+      <button
+        v-if="!loading && (result?.isDraft || route.query.isDraft === 'true')"
+        class="btn-retry"
+        @click="retryExam"
+      >다시 풀기</button>
     </div>
 
     <div v-if="loading" class="loading">결과를 불러오는 중...</div>
