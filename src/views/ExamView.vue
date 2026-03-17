@@ -223,7 +223,7 @@ const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const saveMode = ref('submit') // 'submit' | 'draft'
 const submitting = ref(false)
-const panelWidths = ref(examType === 'GSAT' ? [3, 1.5, 1.5] : [3, 1.5, 1.5])
+const panelWidths = ref(examType === 'GSAT' ? [5, 1.5, 1.5] : [5, 1.5, 1.5])
 const showToolPanel = ref(true)
 const bodyRef = ref(null)
 let draggingIdx = -1

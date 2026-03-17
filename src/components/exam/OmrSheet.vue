@@ -133,7 +133,8 @@ function confirmReset() {
 .omr-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-start;
+  gap: 12px;
   padding: 4px 2px;
   border-radius: 6px;
   transition: background 0.1s;
@@ -152,20 +153,18 @@ function confirmReset() {
 }
 
 .choices {
-  flex: 1;
   display: flex;
   gap: 4px;
 }
 
 .choice-btn {
-  flex: 1;
-  min-width: 0;
-  max-width: 80px;
-  aspect-ratio: 1;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1.5px solid #d1d5db;
   background: #fff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: #374151;
   transition: all 0.15s;
@@ -195,10 +194,10 @@ function confirmReset() {
 }
 
 .guess-btn {
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 700;
   background: #f3f4f6;
   color: #9ca3af;
@@ -214,8 +213,8 @@ function confirmReset() {
 .omr-row.guessed .q-num { color: #d97706; }
 
 .wrong-btn {
-  width: 18px; height: 18px; border-radius: 50%;
-  font-size: 10px; font-weight: 700;
+  width: 30px; height: 30px; border-radius: 50%;
+  font-size: 14px; font-weight: 700;
   background: #f3f4f6; color: #9ca3af; border: 1px solid #e5e7eb;
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
