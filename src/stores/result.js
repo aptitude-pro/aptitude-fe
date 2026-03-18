@@ -81,9 +81,34 @@ export const useResultStore = defineStore('result', () => {
     }
   }
 
+  async function deleteResult(id) {
+    try {
+      await apiClient.delete(`/results/${id}`)
+      results.value = results.value.filter(r => r.id !== id)
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
+  async function updateManualResult(resultId, categoryScores, meta = {}) {
+    try {
+      const totalScore = Object.values(categoryScores).reduce((a, b) => a + b, 0)
+      const res = await apiClient.put(`/results/${resultId}/manual`, {
+        categoryScores, totalScore,
+        examYear: meta.examYear, examPeriod: meta.examPeriod,
+        platform: meta.platform, examRound: meta.examRound ?? null,
+        elapsedSeconds: (meta.elapsedSeconds > 0) ? meta.elapsedSeconds : null,
+        questions: meta.questions ?? [],
+        isDraft: meta.isDraft ?? false
+      })
+      return { success: true, resultId: res.data.data.id }
+    } catch (_) { return { success: false } }
+  }
+
   return {
     results, currentResult, growthData, categoryData, stats,
     fetchResults, fetchResult, fetchGrowthData, fetchCategoryData, fetchStats,
-    saveManualResult
+    saveManualResult, updateManualResult, deleteResult
   }
 })

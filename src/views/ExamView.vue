@@ -54,8 +54,8 @@
           @clear="handleClear"
           @submit="showSubmitDialog = true"
           @save="handleSave"
-          @toggleGuess="(n) => examStore.guesses[n] ? examStore.clearGuess(n) : examStore.setGuess(n)"
-          @toggleWrong="(n) => examStore.wrongs[n] ? examStore.clearWrong(n) : examStore.setWrong(n)"
+          @toggleGuess="handleToggleGuess"
+          @toggleWrong="handleToggleWrong"
         />
       </div>
 
@@ -112,7 +112,7 @@
       :guesses="examStore.guesses"
       :wrongs="examStore.wrongs"
       :elapsedSeconds="timerElapsed"
-      :isDraft="saveMode === 'draft'"
+      :retryResultId="retryResultId"
       @saved="onScoreSaved"
       @close="showScoreModal = false"
     />
@@ -144,6 +144,12 @@
           ⚠️ GSAT는 오답 감점제가 적용됩니다. 확실하지 않은 문항은 신중하게 선택하세요.
         </p>
         <p class="dialog-hint">제출 후에는 답안을 수정할 수 없습니다.</p>
+        <textarea
+          v-model="sessionNote"
+          class="note-textarea"
+          placeholder="이 시험에 대한 메모를 남겨보세요 (선택, 결과 페이지에서 수정 가능)"
+          rows="3"
+        ></textarea>
         <div class="dialog-actions">
           <button class="btn-primary" @click="handleSubmit" :disabled="submitting">
             {{ submitting ? '제출 중...' : '최종 제출' }}
@@ -162,6 +168,8 @@ const isNarrow = ref(window.innerWidth < 900)
 function onResize() { isNarrow.value = window.innerWidth < 900 }
 import { useRoute, useRouter } from 'vue-router'
 import { useExamStore } from '@/stores/exam'
+import { useResultStore } from '@/stores/result'
+import { useAuthStore } from '@/stores/auth'
 import ExamTimer from '@/components/exam/ExamTimer.vue'
 import PdfViewer from '@/components/exam/PdfViewer.vue'
 import OmrSheet from '@/components/exam/OmrSheet.vue'
@@ -172,10 +180,13 @@ import ScoreInputModal from '@/components/exam/ScoreInputModal.vue'
 const route = useRoute()
 const router = useRouter()
 const examStore = useExamStore()
+const resultStore = useResultStore()
+const authStore = useAuthStore()
 
 const sessionId = route.params.sessionId
 const examName = route.query.examName || 'SKCT 시험'
 const examType = route.query.examType || ''
+const retryResultId = route.query.retryResultId || null
 const questionCount = parseInt(route.query.questionCount) || 40
 const isStudyMode = computed(() => route.query.mode === 'study')
 const isLocalSession = sessionId.startsWith('local-') || sessionId.startsWith('study-')
@@ -189,6 +200,23 @@ function saveLocalSessionData() {
     memoText: examStore.memoText
   }
   localStorage.setItem(`skct_session_data_${sessionId}`, JSON.stringify(data))
+}
+
+// 서버 세션에서도 ?/x 마크를 localStorage에 별도 저장
+function saveMarksLocally() {
+  localStorage.setItem(`skct_marks_${sessionId}`, JSON.stringify({
+    guesses: { ...examStore.guesses },
+    wrongs: { ...examStore.wrongs }
+  }))
+}
+
+function loadMarksLocally() {
+  try {
+    const data = JSON.parse(localStorage.getItem(`skct_marks_${sessionId}`) || 'null')
+    if (!data) return
+    if (data.guesses) Object.keys(data.guesses).forEach(k => examStore.setGuess(parseInt(k)))
+    if (data.wrongs) Object.keys(data.wrongs).forEach(k => examStore.setWrong(parseInt(k)))
+  } catch (_) {}
 }
 
 function saveSessionToLocalStorage() {
@@ -211,6 +239,7 @@ function removeSessionFromLocalStorage() {
   const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]')
   localStorage.setItem('skct_sessions', JSON.stringify(sessions.filter(s => s.sessionId !== sessionId)))
   localStorage.removeItem(`skct_session_data_${sessionId}`)
+  localStorage.removeItem(`skct_marks_${sessionId}`)
 }
 const totalSeconds = ref(0)
 const remainingSeconds = ref(0)
@@ -221,8 +250,9 @@ const timerEverStarted = ref(false)
 const showSubmitDialog = ref(false)
 const showExitDialog = ref(false)
 const showScoreModal = ref(false)
-const saveMode = ref('submit') // 'submit' | 'draft'
+const sessionNote = ref('')
 const submitting = ref(false)
+const saveAfterExit = ref(false)
 const panelWidths = ref(examType === 'GSAT' ? [5, 1.5, 1.5] : [5, 1.5, 1.5])
 const showToolPanel = ref(true)
 const bodyRef = ref(null)
@@ -261,6 +291,7 @@ onMounted(async () => {
   examStore.resetAll()
   if (!isLocalSession) {
     await examStore.loadSession(sessionId)
+    loadMarksLocally()
   } else {
     // 1. localStorage 저장 답안 복원 (이어하기)
     const stored = localStorage.getItem(`skct_session_data_${sessionId}`)
@@ -281,6 +312,18 @@ onMounted(async () => {
         Object.entries(prev).forEach(([k, v]) => examStore.setAnswer(parseInt(k), v))
       } catch (_) {}
     }
+    // prevGuesses 복원
+    if (route.query.prevGuesses) {
+      try {
+        JSON.parse(route.query.prevGuesses).forEach(no => examStore.setGuess(parseInt(no)))
+      } catch (_) {}
+    }
+    // prevWrongs 복원
+    if (route.query.prevWrongs) {
+      try {
+        JSON.parse(route.query.prevWrongs).forEach(no => examStore.setWrong(parseInt(no)))
+      } catch (_) {}
+    }
 
     saveSessionToLocalStorage()
   }
@@ -289,6 +332,7 @@ onMounted(async () => {
   saveTimer = setInterval(() => {
     if (!isLocalSession) {
       examStore.saveAnswers(sessionId)
+      saveMarksLocally()
     } else {
       saveLocalSessionData()
     }
@@ -371,7 +415,6 @@ async function handleSubmit(auto = false) {
 
   // SKCT는 로컬/서버 무관하게 항상 수동 채점 모달
   if (examType === 'SKCT') {
-    saveMode.value = 'submit'
     showScoreModal.value = true
     submitting.value = false
     return
@@ -384,29 +427,49 @@ async function handleSubmit(auto = false) {
     submitting.value = false
     if (result.success) {
       removeSessionFromLocalStorage()
-      router.push(`/results/${result.data.id}`)
+      const trimmed = sessionNote.value.trim()
+      if (trimmed) {
+        localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
+        localStorage.setItem(`result_note_${result.data.id}`, trimmed)
+      }
+      router.push({ path: `/results/${result.data.id}`, query: { sessionId } })
       return
     }
   }
 
   // 로컬 세션 (비-SKCT): 답안 전달
   removeSessionFromLocalStorage()
+  const trimmed = sessionNote.value.trim()
+  if (trimmed) localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
   router.push({
     name: 'ResultDetail',
     params: { id: 'local' },
-    query: { answers: JSON.stringify(examStore.answers), questionCount, examName }
+    query: { answers: JSON.stringify(examStore.answers), questionCount, examName, sessionId }
   })
 }
 
 function onScoreSaved({ resultId, isDraft } = {}) {
   removeSessionFromLocalStorage()
+  const trimmed = sessionNote.value.trim()
+  const afterExit = saveAfterExit.value
+  saveAfterExit.value = false
+
   if (typeof resultId === 'number') {
-    router.push({ path: `/results/${resultId}`, query: isDraft ? { isDraft: 'true' } : {} })
+    if (trimmed) {
+      localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
+      localStorage.setItem(`result_note_${resultId}`, trimmed)
+    }
+    if (afterExit || isDraft) {
+      router.push('/my/results')
+    } else {
+      router.push({ path: `/results/${resultId}`, query: { sessionId } })
+    }
   } else {
+    if (trimmed) localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
     router.push({
       name: 'ResultDetail',
       params: { id: 'local' },
-      query: { categoryScores: JSON.stringify(resultId), examName }
+      query: { categoryScores: JSON.stringify(resultId), examName, sessionId }
     })
   }
 }
@@ -415,29 +478,76 @@ function exitWithoutSave() {
   router.push('/exam')
 }
 
+function buildDraftQuestions() {
+  const allNos = new Set([
+    ...Object.keys(examStore.answers).map(Number),
+    ...Object.keys(examStore.guesses).filter(k => examStore.guesses[k]).map(Number),
+    ...Object.keys(examStore.wrongs).filter(k => examStore.wrongs[k]).map(Number)
+  ])
+  return [...allNos].sort((a, b) => a - b).map(no => ({
+    questionNo: no,
+    selectedAnswer: examStore.answers[no] ?? null,
+    isGuessed: !!examStore.guesses[no],
+    isWrong: !!examStore.wrongs[no]
+  }))
+}
+
+async function saveDraftToDb() {
+  if (!authStore.isLoggedIn) return
+  const draftScores = Object.fromEntries(
+    ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'].map(c => [c, 0])
+  )
+  const meta = {
+    examYear: null, examPeriod: null, platform: null, examRound: null,
+    elapsedSeconds: timerElapsed.value,
+    questions: buildDraftQuestions(),
+    isDraft: true
+  }
+  if (retryResultId) {
+    await resultStore.updateManualResult(retryResultId, draftScores, meta)
+  } else {
+    await resultStore.saveManualResult(isLocalSession ? null : sessionId, draftScores, meta)
+  }
+}
+
 async function handleSave() {
   if (!isLocalSession) {
     await examStore.saveAnswers(sessionId)
+    saveMarksLocally()
+  } else {
+    saveLocalSessionData()
+    saveSessionToLocalStorage()
+  }
+  router.push('/exam')
+}
+
+async function exitWithSave() {
+  if (!isLocalSession) {
+    await examStore.saveAnswers(sessionId)
+    saveMarksLocally()
   } else {
     saveLocalSessionData()
     saveSessionToLocalStorage()
   }
   if (examType === 'SKCT') {
-    saveMode.value = 'draft'
+    saveAfterExit.value = true
+    showExitDialog.value = false
     showScoreModal.value = true
   } else {
     router.push('/exam')
   }
 }
 
-async function exitWithSave() {
-  if (!isLocalSession) {
-    await examStore.saveAnswers(sessionId)
-  } else {
-    saveLocalSessionData()
-    saveSessionToLocalStorage()
-  }
-  router.push('/exam')
+function handleToggleGuess(n) {
+  if (examStore.guesses[n]) examStore.clearGuess(n)
+  else examStore.setGuess(n)
+  isLocalSession ? saveLocalSessionData() : saveMarksLocally()
+}
+
+function handleToggleWrong(n) {
+  if (examStore.wrongs[n]) examStore.clearWrong(n)
+  else examStore.setWrong(n)
+  isLocalSession ? saveLocalSessionData() : saveMarksLocally()
 }
 
 function handleStudyComplete() {
@@ -668,6 +778,12 @@ function openToolPanel() {
 .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
 .btn-danger { background: #ef4444; color: #fff; }
 .btn-danger:hover { background: #dc2626; }
+.note-textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; resize: none; font-family: inherit;
+  margin-bottom: 12px; color: var(--text); box-sizing: border-box;
+}
+.note-textarea:focus { outline: none; border-color: var(--primary); }
 
 @media (max-width: 900px) {
   .panel-tools { flex: 1; }

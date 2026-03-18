@@ -112,7 +112,10 @@
           </thead>
           <tbody>
             <tr v-for="r in filteredResults" :key="r.id">
-              <td class="name-cell">{{ r.examTitle || r.examType }}</td>
+              <td class="name-cell">
+                {{ r.examTitle || r.examType }}
+                <span v-if="r.isDraft" class="badge-draft">임시저장</span>
+              </td>
               <td><span :class="['type-badge', r.examType]">{{ r.examType }}</span></td>
               <td class="meta-cell">{{ r.examYear || '-' }}</td>
               <td class="meta-cell">{{ r.examPeriod || '-' }}</td>
@@ -121,8 +124,16 @@
                 <span :class="['score-val', scoreClass(r.totalScore)]">{{ r.totalScore }}점</span>
               </td>
               <td class="date-cell">{{ formatDate(r.finishedAt || r.createdAt) }}</td>
-              <td>
+              <td class="action-cell">
                 <router-link :to="`/results/${r.id}`" class="view-btn">상세 →</router-link>
+                <button
+                  v-if="r.isDraft"
+                  class="retry-btn"
+                  @click="retryFromList(r)"
+                >다시 풀기</button>
+                <button class="delete-btn" @click="confirmDelete(r)" title="삭제">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6"/><path d="M10,11v6"/><path d="M14,11v6"/><path d="M9,6V4h6v2"/></svg>
+                </button>
               </td>
             </tr>
           </tbody>
@@ -130,20 +141,38 @@
       </div>
     </div>
   </div>
+
+  <!-- 삭제 확인 다이얼로그 -->
+  <div v-if="deleteTarget" class="dialog-overlay" @click.self="deleteTarget = null">
+    <div class="dialog-box">
+      <h3>성적 기록을 삭제하시겠습니까?</h3>
+      <p class="dialog-desc">{{ deleteTarget.examTitle || deleteTarget.examType }} 기록이 영구적으로 삭제됩니다.</p>
+      <div class="dialog-actions">
+        <button class="btn-danger" :disabled="deleting" @click="doDelete">
+          {{ deleting ? '삭제 중...' : '삭제' }}
+        </button>
+        <button class="btn-secondary" :disabled="deleting" @click="deleteTarget = null">취소</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useResultStore } from '@/stores/result'
 import ScoreLineChart from '@/components/dashboard/ScoreLineChart.vue'
 import CategoryRadarChart from '@/components/dashboard/CategoryRadarChart.vue'
 
+const router = useRouter()
 const resultStore = useResultStore()
 const selectedType = ref('')
 const selectedYear = ref('')
 const selectedPeriod = ref('')
 const selectedPlatform = ref('')
 const chartTab = ref('total')
+const deleteTarget = ref(null)
+const deleting = ref(false)
 
 const EXAM_CATEGORIES = {
   SKCT: ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'],
@@ -262,9 +291,39 @@ function scoreClass(score) {
   return 'low'
 }
 
+function retryFromList(r) {
+  const newSessionId = `local-${Date.now()}`
+  router.push({
+    name: 'ExamSession',
+    params: { sessionId: newSessionId },
+    query: {
+      examType: r.examType || 'SKCT',
+      questionCount: 100,
+      examName: r.examTitle || r.examType,
+      retryResultId: r.id
+    }
+  })
+}
+
+function confirmDelete(r) {
+  deleteTarget.value = r
+}
+
+async function doDelete() {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  await resultStore.deleteResult(deleteTarget.value.id)
+  deleting.value = false
+  deleteTarget.value = null
+  await Promise.all([resultStore.fetchGrowthData(selectedType.value), resultStore.fetchCategoryData()])
+}
+
 function formatDate(d) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(d).toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  })
 }
 </script>
 
@@ -409,6 +468,82 @@ function formatDate(d) {
   font-size: 12px;
   color: var(--primary);
   font-weight: 500;
+}
+.retry-btn {
+  font-size: 12px;
+  color: #fff;
+  background: var(--primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.retry-btn:hover { background: var(--primary-hover); }
+
+.action-cell { white-space: nowrap; }
+.delete-btn {
+  margin-left: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #9ca3af;
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.delete-btn:hover { color: var(--danger); background: #fee2e2; }
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.dialog-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 28px;
+  width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.dialog-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.dialog-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-danger {
+  padding: 8px 16px;
+  background: var(--danger);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary {
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.badge-draft {
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 6px;
 }
 
 @media (max-width: 768px) {

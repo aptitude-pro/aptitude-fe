@@ -16,7 +16,10 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
           </div>
           <div>
-            <div class="exam-name">{{ exam.name }}</div>
+            <div class="exam-name">
+              {{ exam.name }}
+              <span v-if="savedSessions.find(s => s.examType === exam.id)" class="badge-in-progress">진행 중</span>
+            </div>
             <div class="exam-full-name">{{ exam.fullName }}</div>
           </div>
         </div>
@@ -42,6 +45,23 @@
       </div>
     </div>
 
+    <!-- 진행 중인 시험 섹션 -->
+    <section v-if="savedSessions.length" class="in-progress-section">
+      <h3 class="in-progress-title">진행 중인 시험</h3>
+      <div class="session-list">
+        <div v-for="s in savedSessions" :key="s.sessionId" class="session-card">
+          <div class="session-info">
+            <span class="session-name">{{ s.examName }}</span>
+            <span class="session-date">{{ formatDate(s.savedAt) }}</span>
+          </div>
+          <div class="session-actions">
+            <button class="btn-resume" @click="doResumeSession(s)">이어하기</button>
+            <button class="btn-delete" @click="deleteSession(s.sessionId)">삭제</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 시험 준비 팁 -->
     <div class="tips-section">
       <h3>시험 준비 팁</h3>
@@ -52,6 +72,20 @@
           </div>
           <div class="tip-title">{{ tip.title }}</div>
           <div class="tip-desc">{{ tip.desc }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 이어하기 다이얼로그 -->
+    <div v-if="showResumeDialog" class="dialog-overlay" @click.self="showResumeDialog = false">
+      <div class="dialog">
+        <h3>진행 중인 세션이 있습니다</h3>
+        <p>{{ resumeCandidate?.examName }} 세션이 저장되어 있습니다.</p>
+        <p class="dialog-hint">저장 시각: {{ formatDate(resumeCandidate?.savedAt) }}</p>
+        <div class="dialog-actions">
+          <button class="btn-primary" @click="doResume">이어하기</button>
+          <button class="btn-danger" @click="doFreshStart">새로 시작</button>
+          <button class="btn-secondary" @click="showResumeDialog = false">취소</button>
         </div>
       </div>
     </div>
@@ -75,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '@/api'
 
@@ -83,6 +117,16 @@ const router = useRouter()
 const showStartDialog = ref(false)
 const selectedExam = ref(null)
 const starting = ref(false)
+const savedSessions = ref([])
+const showResumeDialog = ref(false)
+const resumeCandidate = ref(null)
+
+onMounted(() => {
+  try {
+    savedSessions.value = JSON.parse(localStorage.getItem('skct_sessions') || '[]')
+      .filter(s => s.mode !== 'study')
+  } catch (_) { savedSessions.value = [] }
+})
 
 const examTypes = [
   {
@@ -134,7 +178,13 @@ const tips = [
 
 function startExam(exam) {
   selectedExam.value = exam
-  showStartDialog.value = true
+  const existing = savedSessions.value.find(s => s.examType === exam.id)
+  if (existing) {
+    resumeCandidate.value = existing
+    showResumeDialog.value = true
+  } else {
+    showStartDialog.value = true
+  }
 }
 
 async function confirmStart() {
@@ -157,6 +207,47 @@ async function confirmStart() {
     starting.value = false
     showStartDialog.value = false
   }
+}
+
+function doResume() {
+  showResumeDialog.value = false
+  router.push({
+    name: 'ExamSession',
+    params: { sessionId: resumeCandidate.value.sessionId },
+    query: { examType: resumeCandidate.value.examType, questionCount: resumeCandidate.value.questionCount, examName: resumeCandidate.value.examName }
+  })
+}
+
+function doFreshStart() {
+  const sid = resumeCandidate.value.sessionId
+  localStorage.removeItem(`skct_session_data_${sid}`)
+  localStorage.removeItem(`skct_marks_${sid}`)
+  const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]').filter(s => s.sessionId !== sid)
+  localStorage.setItem('skct_sessions', JSON.stringify(sessions))
+  savedSessions.value = sessions.filter(s => s.mode !== 'study')
+  showResumeDialog.value = false
+  showStartDialog.value = true
+}
+
+function doResumeSession(s) {
+  router.push({
+    name: 'ExamSession',
+    params: { sessionId: s.sessionId },
+    query: { examType: s.examType, questionCount: s.questionCount, examName: s.examName }
+  })
+}
+
+function deleteSession(sid) {
+  localStorage.removeItem(`skct_session_data_${sid}`)
+  localStorage.removeItem(`skct_marks_${sid}`)
+  const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]').filter(s => s.sessionId !== sid)
+  localStorage.setItem('skct_sessions', JSON.stringify(sessions))
+  savedSessions.value = sessions.filter(s => s.mode !== 'study')
+}
+
+function formatDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
@@ -368,6 +459,25 @@ async function confirmStart() {
   font-size: 14px;
   font-weight: 600;
 }
+
+.badge-in-progress {
+  font-size: 11px; font-weight: 600; color: #fff;
+  background: #f59e0b; border-radius: 4px; padding: 2px 6px; margin-left: 6px;
+  vertical-align: middle;
+}
+.in-progress-section { margin-bottom: 32px; }
+.in-progress-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+.session-list { display: flex; flex-direction: column; gap: 8px; }
+.session-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+}
+.session-info { display: flex; flex-direction: column; gap: 2px; }
+.session-name { font-size: 14px; font-weight: 600; }
+.session-date { font-size: 12px; color: var(--text-muted); }
+.session-actions { display: flex; gap: 8px; }
+.btn-resume { background: var(--primary); color: #fff; padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 600; }
+.btn-delete { background: #fff; color: #ef4444; border: 1px solid #fca5a5; padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; }
 
 @media (max-width: 768px) {
   .exam-cards, .tips-grid {

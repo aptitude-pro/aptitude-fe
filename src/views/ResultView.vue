@@ -4,7 +4,7 @@
       <router-link to="/my/results" class="back-btn">← 목록으로</router-link>
       <h2>결과 확인</h2>
       <button
-        v-if="!loading && (result?.isDraft || route.query.isDraft === 'true')"
+        v-if="!loading && result"
         class="btn-retry"
         @click="retryExam"
       >다시 풀기</button>
@@ -95,6 +95,29 @@
         </div>
       </div>
 
+      <!-- 메모 섹션 -->
+      <div class="result-note card">
+        <div class="note-header">
+          <span class="note-label">메모</span>
+          <button v-if="!isEditingNote" class="btn-edit-note"
+            @click="isEditingNote = true; editNoteText = resultNote">
+            {{ resultNote ? '수정' : '작성' }}
+          </button>
+        </div>
+        <div v-if="!isEditingNote">
+          <p v-if="resultNote" class="note-content">{{ resultNote }}</p>
+          <p v-else class="note-placeholder">메모가 없습니다.</p>
+        </div>
+        <div v-else class="note-edit">
+          <textarea v-model="editNoteText" rows="3" class="note-textarea"
+            placeholder="이 시험에 대한 메모를 남겨보세요"></textarea>
+          <div class="note-actions">
+            <button class="btn-primary btn-sm" @click="saveNote">저장</button>
+            <button class="btn-secondary btn-sm" @click="isEditingNote = false">취소</button>
+          </div>
+        </div>
+      </div>
+
     </template>
   </div>
 </template>
@@ -129,11 +152,36 @@ const examStore = useExamStore()
 const loading = ref(true)
 const result = ref(null)
 const savedMarks = ref({ guesses: {}, wrongs: {} })
+const resultNote = ref('')
+const isEditingNote = ref(false)
+const editNoteText = ref('')
 
 const questionCount = computed(() => {
   const type = result.value?.examType || route.query.examType
   return EXAM_QUESTION_COUNT[type] || parseInt(route.query.questionCount) || 40
 })
+
+function loadNote(id) {
+  const sId = route.query.sessionId
+  if (sId) {
+    const n = localStorage.getItem(`result_note_session_${sId}`)
+    if (n) { resultNote.value = n; return }
+  }
+  if (id && id !== 'local') {
+    const n = localStorage.getItem(`result_note_${id}`)
+    if (n) resultNote.value = n
+  }
+}
+
+function saveNote() {
+  const sId = route.query.sessionId
+  const id = route.params.id
+  const text = editNoteText.value.trim()
+  resultNote.value = text
+  if (sId) localStorage.setItem(`result_note_session_${sId}`, text)
+  if (id && id !== 'local') localStorage.setItem(`result_note_${id}`, text)
+  isEditingNote.value = false
+}
 
 onMounted(async () => {
   const id = route.params.id
@@ -163,12 +211,14 @@ onMounted(async () => {
         answers: []
       }
     }
+    loadNote(id)
     loading.value = false
     return
   }
   await resultStore.fetchResult(id)
   result.value = resultStore.currentResult
   loading.value = false
+  loadNote(id)
 
   const storeHasMarks =
     Object.keys(examStore.guesses).length > 0 ||
@@ -277,7 +327,10 @@ function retryExam() {
       examType,
       questionCount: qCount,
       examName: examNameVal,
-      prevAnswers: JSON.stringify(prevAnswers)
+      prevAnswers: JSON.stringify(prevAnswers),
+      retryResultId: route.params.id,
+      prevGuesses: guessedList.value.length ? JSON.stringify(guessedList.value) : undefined,
+      prevWrongs:  wrongList.value.length  ? JSON.stringify(wrongList.value)  : undefined
     }
   })
 }
@@ -439,6 +492,20 @@ function circleNum(n) {
 .cell-badges { display: flex; flex-direction: row; gap: 2px; min-height: 14px; }
 .badge-guess { font-size: 10px; color: #d97706; font-weight: 700; }
 .badge-wrong { font-size: 10px; color: #ef4444; font-weight: 700; }
+
+.result-note { display: flex; flex-direction: column; gap: 10px; }
+.note-header { display: flex; align-items: center; justify-content: space-between; }
+.note-label { font-size: 15px; font-weight: 600; }
+.btn-edit-note { font-size: 13px; color: var(--primary); font-weight: 500; background: none; border: none; cursor: pointer; }
+.note-content { font-size: 14px; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
+.note-placeholder { font-size: 13px; color: var(--text-light); }
+.note-edit { display: flex; flex-direction: column; gap: 8px; }
+.note-textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; resize: none; font-family: inherit; box-sizing: border-box; }
+.note-textarea:focus { outline: none; border-color: var(--primary); }
+.note-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-primary { background: var(--primary); color: #fff; border-radius: 8px; font-weight: 600; }
+.btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-weight: 500; }
+.btn-sm { padding: 6px 14px !important; font-size: 13px !important; }
 
 @media (max-width: 700px) {
   .summary-grid { grid-template-columns: 1fr 1fr; }

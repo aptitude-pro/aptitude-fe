@@ -1,66 +1,81 @@
 <template>
   <div v-if="visible" class="modal-overlay">
     <div class="modal">
-      <div class="modal-header">
-        <h3>{{ isDraft ? '임시저장' : '채점 결과 입력' }}</h3>
-        <p>{{ isDraft ? '응시 정보를 입력하세요' : '응시 정보와 분야별 점수를 입력하세요 (0~20)' }}</p>
-      </div>
 
-      <!-- 메타데이터 입력 -->
-      <div class="meta-section">
-        <div class="meta-row">
-          <label class="meta-label">응시 년도</label>
-          <select v-model="selectedYear" class="meta-select">
-            <option v-for="y in YEARS" :key="y" :value="y">{{ y }}년</option>
-          </select>
+        <div class="modal-header">
+          <h3>채점 결과 입력</h3>
+          <p>응시 정보와 분야별 점수를 입력하세요 (0~20)</p>
         </div>
 
-        <div class="meta-row">
-          <label class="meta-label">시험 시기</label>
-          <div class="meta-options">
-            <button
-              v-for="p in PERIODS"
-              :key="p"
-              :class="['meta-btn', { active: selectedPeriod === p }]"
-              @click="selectedPeriod = p"
-            >{{ p }}</button>
+        <!-- 저장 방법 선택 (다시 풀기인 경우) -->
+        <div v-if="retryResultId" class="save-method-section">
+          <label class="meta-label">저장 방법</label>
+          <div class="save-method-options">
+            <label :class="['method-btn', { active: saveMethod === 'overwrite' }]">
+              <input type="radio" v-model="saveMethod" value="overwrite" />
+              기존 결과 덮어쓰기
+            </label>
+            <label :class="['method-btn', { active: saveMethod === 'new' }]">
+              <input type="radio" v-model="saveMethod" value="new" />
+              새 결과로 저장
+            </label>
           </div>
         </div>
 
-        <div class="meta-row">
-          <label class="meta-label">플랫폼</label>
-          <div class="meta-options platform-options">
-            <button
-              v-for="pl in PLATFORMS"
-              :key="pl"
-              :class="['meta-btn', { active: selectedPlatform === pl }]"
-              @click="selectedPlatform = pl"
-            >{{ pl }}</button>
-            <input
-              v-if="selectedPlatform === '기타'"
-              v-model="customPlatform"
-              class="platform-input"
-              placeholder="직접 입력"
-            />
+        <!-- 메타데이터 입력 -->
+        <div class="meta-section">
+          <div class="meta-row">
+            <label class="meta-label">응시 년도</label>
+            <select v-model="selectedYear" class="meta-select">
+              <option v-for="y in YEARS" :key="y" :value="y">{{ y }}년</option>
+            </select>
+          </div>
+
+          <div class="meta-row">
+            <label class="meta-label">시험 시기</label>
+            <div class="meta-options">
+              <button
+                v-for="p in PERIODS"
+                :key="p"
+                :class="['meta-btn', { active: selectedPeriod === p }]"
+                @click="selectedPeriod = p"
+              >{{ p }}</button>
+            </div>
+          </div>
+
+          <div class="meta-row">
+            <label class="meta-label">플랫폼</label>
+            <div class="meta-options platform-options">
+              <button
+                v-for="pl in PLATFORMS"
+                :key="pl"
+                :class="['meta-btn', { active: selectedPlatform === pl }]"
+                @click="selectedPlatform = pl"
+              >{{ pl }}</button>
+              <input
+                v-if="selectedPlatform === '기타'"
+                v-model="customPlatform"
+                class="platform-input"
+                placeholder="직접 입력"
+              />
+            </div>
+          </div>
+
+          <div class="meta-row">
+            <label class="meta-label">회차</label>
+            <div class="round-input-wrap">
+              <input
+                type="number"
+                min="1"
+                v-model.number="selectedRound"
+                class="round-input"
+                placeholder="회차"
+              />
+              <span class="unit">회</span>
+            </div>
           </div>
         </div>
 
-        <div class="meta-row">
-          <label class="meta-label">회차</label>
-          <div class="round-input-wrap">
-            <input
-              type="number"
-              min="1"
-              v-model.number="selectedRound"
-              class="round-input"
-              placeholder="회차"
-            />
-            <span class="unit">회</span>
-          </div>
-        </div>
-      </div>
-
-      <template v-if="!isDraft">
         <div class="divider-line" />
 
         <div class="score-fields">
@@ -84,16 +99,15 @@
           <span class="total-label">총점</span>
           <span class="total-value">{{ totalScore }}점</span>
         </div>
-      </template>
 
-      <div class="modal-actions">
-        <button class="btn-cancel" @click="$emit('close')">취소</button>
-        <button class="btn-submit" @click="handleSubmit" :disabled="submitting">
-          {{ submitting ? '저장 중...' : authStore.isLoggedIn ? (isDraft ? '임시저장' : '제출하기') : '로그인하여 저장' }}
-        </button>
-      </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" @click="$emit('close')">취소</button>
+          <button class="btn-submit" @click="handleSubmit" :disabled="submitting">
+            {{ submitting ? '저장 중...' : authStore.isLoggedIn ? '제출하기' : '로그인하여 저장' }}
+          </button>
+        </div>
 
-      <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
+        <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
     </div>
   </div>
 </template>
@@ -110,7 +124,7 @@ const props = defineProps({
   guesses:  { type: Object, default: () => ({}) },
   wrongs:   { type: Object, default: () => ({}) },
   elapsedSeconds: { type: Number, default: null },
-  isDraft: { type: Boolean, default: false }
+  retryResultId: { type: [String, Number], default: null }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -128,6 +142,7 @@ const selectedPeriod = ref('상반기')
 const selectedPlatform = ref('해커스')
 const customPlatform = ref('')
 const selectedRound = ref(null)  // number | null
+const saveMethod = ref('overwrite') // 'overwrite' | 'new'
 const submitting = ref(false)
 const errorMsg = ref('')
 
@@ -158,51 +173,49 @@ const effectivePlatform = computed(() =>
 async function handleSubmit() {
   errorMsg.value = ''
 
-  if (!props.isDraft) {
-    const filled = CATEGORIES.filter(c => scores.value[c] !== null && scores.value[c] !== '')
-    if (filled.length < CATEGORIES.length) {
-      errorMsg.value = '모든 분야의 점수를 입력해주세요.'
-      return
-    }
-    const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
-    if (invalid) {
-      errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
-      return
-    }
+  const filled = CATEGORIES.filter(c => scores.value[c] !== null && scores.value[c] !== '')
+  if (filled.length < CATEGORIES.length) {
+    errorMsg.value = '모든 분야의 점수를 입력해주세요.'
+    return
   }
-
-  const draftScores = props.isDraft
-    ? Object.fromEntries(CATEGORIES.map(c => [c, 0]))
-    : { ...scores.value }
+  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
+  if (invalid) {
+    errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
+    return
+  }
 
   if (!authStore.isLoggedIn) {
     sessionStorage.setItem('pendingManualResult', JSON.stringify({
-      scores: draftScores,
+      scores: { ...scores.value },
       examYear: selectedYear.value,
       examPeriod: selectedPeriod.value,
       platform: effectivePlatform.value,
       examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
       questions: buildQuestions(),
-      isDraft: props.isDraft
+      isDraft: false
     }))
     authStore.openModal('login')
     return
   }
 
-  submitting.value = true
-  const result = await resultStore.saveManualResult(props.sessionId, draftScores, {
+  const meta = {
     examYear: selectedYear.value,
     examPeriod: selectedPeriod.value,
     platform: effectivePlatform.value,
     examRound: selectedRound.value ? String(selectedRound.value) + '회' : null,
     elapsedSeconds: props.elapsedSeconds,
     questions: buildQuestions(),
-    isDraft: props.isDraft
-  })
+    isDraft: false
+  }
+  submitting.value = true
+  const shouldOverwrite = props.retryResultId && saveMethod.value === 'overwrite'
+  const result = shouldOverwrite
+    ? await resultStore.updateManualResult(props.retryResultId, { ...scores.value }, meta)
+    : await resultStore.saveManualResult(props.sessionId, { ...scores.value }, meta)
   submitting.value = false
 
   if (result.success) {
-    emit('saved', { resultId: result.resultId, isDraft: props.isDraft })
+    emit('saved', { resultId: result.resultId, isDraft: false })
   } else {
     errorMsg.value = '저장에 실패했습니다. 다시 시도해주세요.'
   }
@@ -233,6 +246,37 @@ async function handleSubmit() {
 .modal-header { margin-bottom: 20px; }
 .modal-header h3 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
 .modal-header p { font-size: 13px; color: #6b7280; }
+
+.save-method-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.save-method-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.method-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.method-btn input[type="radio"] { accent-color: #4f46e5; }
+.method-btn.active { border-color: #4f46e5; background: #eef2ff; color: #4338ca; font-weight: 600; }
 
 .meta-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
 
