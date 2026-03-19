@@ -4,7 +4,7 @@
 
         <div class="modal-header">
           <h3>채점 결과 입력</h3>
-          <p>응시 정보와 분야별 점수를 입력하세요 (0~20)</p>
+          <p>응시 정보와 분야별 점수를 입력하세요 (0~100)</p>
         </div>
 
         <!-- 저장 방법 선택 (다시 풀기인 경우) -->
@@ -85,7 +85,7 @@
               <input
                 type="number"
                 min="0"
-                max="20"
+                max="100"
                 v-model.number="scores[cat]"
                 class="score-input"
                 placeholder="0"
@@ -134,7 +134,7 @@ const authStore = useAuthStore()
 const CATEGORIES = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리']
 const YEARS = Array.from({ length: 7 }, (_, i) => 2020 + i)
 const PERIODS = ['상반기', '하반기']
-const PLATFORMS = ['해커스', '링커리어', '인크루트', '에듀윌', '기타']
+const PLATFORMS = ['해커스', '링커리어', '렛유인', '인크루트', '에듀윌', '기타']
 
 const scores = ref(Object.fromEntries(CATEGORIES.map(c => [c, null])))
 const selectedYear = ref(new Date().getFullYear())
@@ -178,9 +178,9 @@ async function handleSubmit() {
     errorMsg.value = '모든 분야의 점수를 입력해주세요.'
     return
   }
-  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
+  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 100)
   if (invalid) {
-    errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
+    errorMsg.value = '점수는 0~100 사이로 입력해주세요.'
     return
   }
 

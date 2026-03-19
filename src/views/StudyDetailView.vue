@@ -25,6 +25,8 @@
       <button :class="['tab', { active: tab === 'board' }]" @click="tab = 'board'">공지 게시판</button>
       <button :class="['tab', { active: tab === 'members' }]" @click="tab = 'members'">멤버</button>
       <button :class="['tab', { active: tab === 'dashboard' }]" @click="onDashboardTab">대시보드</button>
+      <button :class="['tab', { active: tab === 'books' }]" @click="onBooksTab">책 목록</button>
+      <button :class="['tab', { active: tab === 'calendar' }]" @click="onCalendarTab">학습 기록</button>
     </div>
 
     <!-- 랭킹 탭 -->
@@ -105,6 +107,35 @@
         </div>
       </div>
 
+      <!-- 오늘 학습 현황 -->
+      <div class="card">
+        <h3>오늘 학습 현황</h3>
+        <div v-if="todaySummaryLoading" class="empty">불러오는 중...</div>
+        <div v-else-if="studyStore.todaySummary.length === 0" class="empty">데이터가 없습니다</div>
+        <div v-else class="today-summary-list">
+          <div
+            v-for="m in studyStore.todaySummary"
+            :key="m.userId"
+            :class="['today-member', { 'no-log': !m.hasLog }]"
+          >
+            <div class="tm-avatar">{{ m.nickname?.charAt(0) }}</div>
+            <div class="tm-info">
+              <span class="tm-name">{{ m.nickname }}</span>
+              <div v-if="m.hasLog" class="tm-cats">
+                <span v-for="c in m.categories" :key="c.categoryName" class="cat-chip">
+                  {{ c.categoryName }} {{ c.problemCount }}
+                </span>
+              </div>
+              <span v-else class="tm-no-log">아직 기록 없음</span>
+            </div>
+            <div class="tm-total">
+              <span v-if="m.hasLog" class="tm-total-num">{{ m.totalProblems }}<small>문제</small></span>
+              <span v-else class="tm-total-dash">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 동일 회차 시계열 그래프 -->
       <template v-if="dashboard && dashboard.timeSeries.length > 0">
         <div v-for="group in dashboard.timeSeries" :key="group.groupKey" class="card">
@@ -117,6 +148,25 @@
       <div v-else-if="dashboard && dashboard.timeSeries.length === 0" class="card">
         <div class="empty">아직 공통 응시 데이터가 없습니다</div>
       </div>
+    </div>
+
+    <!-- 책 목록 탭 -->
+    <div v-if="tab === 'books'" class="tab-panel">
+      <StudyBookTab
+        :studyId="studyId"
+        :myRole="study?.myRole"
+        :myUserId="myUserId"
+      />
+    </div>
+
+    <!-- 학습 기록 탭 -->
+    <div v-if="tab === 'calendar'" class="tab-panel">
+      <StudyCalendarTab
+        v-if="study"
+        :studyId="studyId"
+        :examType="study.examType"
+        :books="studyStore.books"
+      />
     </div>
 
     <!-- 공지 작성 모달 -->
@@ -144,23 +194,30 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStudyStore } from '@/stores/study'
+import { useAuthStore } from '@/stores/auth'
 import apiClient from '@/api'
 import ScoreLineChart from '@/components/dashboard/ScoreLineChart.vue'
+import StudyBookTab from '@/components/study/StudyBookTab.vue'
+import StudyCalendarTab from '@/components/study/StudyCalendarTab.vue'
 
 const route = useRoute()
 const router = useRouter()
 const studyStore = useStudyStore()
+const authStore = useAuthStore()
 const tab = ref('ranking')
 const showNoticeModal = ref(false)
 const notices = ref([])
 const noticeForm = ref({ title: '', content: '' })
+const todaySummaryLoading = ref(false)
 
 const joinLoading = ref(false)
 const codeCopied = ref(false)
 
+const studyId = computed(() => route.params.id)
 const study = computed(() => studyStore.currentStudy)
 const ranking = computed(() => studyStore.ranking)
 const dashboard = computed(() => studyStore.dashboard)
+const myUserId = computed(() => authStore.user?.id || null)
 
 const CATEGORY_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 
@@ -180,6 +237,25 @@ async function onDashboardTab() {
   tab.value = 'dashboard'
   if (!studyStore.dashboard) {
     await studyStore.fetchDashboard(route.params.id)
+  }
+  // Always refresh today summary when opening dashboard
+  todaySummaryLoading.value = true
+  await studyStore.fetchTodaySummary(route.params.id)
+  todaySummaryLoading.value = false
+}
+
+async function onBooksTab() {
+  tab.value = 'books'
+  if (studyStore.books.length === 0) {
+    await studyStore.fetchBooks(route.params.id)
+  }
+}
+
+async function onCalendarTab() {
+  tab.value = 'calendar'
+  // Books are needed for the log modal; load if not yet loaded
+  if (studyStore.books.length === 0) {
+    await studyStore.fetchBooks(route.params.id)
   }
 }
 
@@ -287,7 +363,7 @@ function formatDate(d) {
 
 .btn-danger { background: #fee2e2; color: #ef4444; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 
-.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); }
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); overflow-x: auto; }
 .tab {
   padding: 10px 20px;
   font-size: 14px;
@@ -297,6 +373,7 @@ function formatDate(d) {
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
@@ -384,6 +461,41 @@ function formatDate(d) {
 .mb-count { font-size: 12px; font-weight: 600; width: 32px; text-align: right; color: var(--text-muted); }
 
 .chart-wrap { min-height: 200px; display: flex; align-items: center; justify-content: center; }
+
+/* Today Summary */
+.today-summary-list { display: flex; flex-direction: column; gap: 8px; }
+.today-member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+.today-member.no-log { background: var(--bg); opacity: 0.7; }
+.tm-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.today-member.no-log .tm-avatar { background: #9ca3af; }
+.tm-info { flex: 1; min-width: 0; }
+.tm-name { display: block; font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.tm-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.cat-chip {
+  font-size: 11px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.tm-no-log { font-size: 12px; color: var(--text-muted); }
+.tm-total { text-align: right; flex-shrink: 0; }
+.tm-total-num { font-size: 18px; font-weight: 700; color: var(--primary); }
+.tm-total-num small { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-left: 2px; }
+.tm-total-dash { font-size: 16px; color: #d1d5db; }
 
 @media (max-width: 768px) {
   .page-header { flex-wrap: wrap; }

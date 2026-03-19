@@ -56,7 +56,7 @@ const props = defineProps({
   wrongs: { type: Object, default: () => ({}) },
   showUnansweredWarning: { type: Boolean, default: false }
 })
-const emit = defineEmits(['mark', 'clear', 'submit', 'save', 'toggleGuess', 'toggleWrong'])
+const emit = defineEmits(['mark', 'clear', 'submit', 'save', 'toggleGuess', 'toggleWrong', 'reset'])
 
 const answeredCount = computed(() => Object.keys(props.answers).length)
 
@@ -69,10 +69,8 @@ function toggleAnswer(questionNo, choice) {
 }
 
 function confirmReset() {
-  if (confirm('모든 답안을 초기화하시겠습니까?')) {
-    for (let i = 1; i <= props.questionCount; i++) {
-      emit('clear', i)
-    }
+  if (confirm('모든 답안과 ?, ✗ 마킹을 초기화하시겠습니까?')) {
+    emit('reset')
   }
 }
 </script>

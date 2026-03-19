@@ -38,18 +38,26 @@
 
     <div v-if="pdfLoaded && viewMode === 'page'" class="page-nav">
       <button class="nav-btn" :disabled="currentPage <= 1" @click="prevPage">◀</button>
-      <span>{{ currentPage }} / {{ totalPages }}</span>
+      <input class="page-input" type="number" v-model.number="pageInput"
+             @keydown.enter.prevent="jumpToPage" @blur="syncPageInput"
+             :min="1" :max="totalPages" />
+      <span class="page-sep">/ {{ totalPages }}</span>
       <button class="nav-btn" :disabled="currentPage >= totalPages" @click="nextPage">▶</button>
     </div>
 
     <div v-if="pdfLoaded && viewMode === 'scroll'" class="page-info">
-      전체 {{ totalPages }}페이지
+      <span>전체 {{ totalPages }}페이지</span>
+      <div class="page-jump">
+        <input type="number" class="page-input" v-model.number="scrollPageInput"
+               @keydown.enter="jumpToScrollPage" :min="1" :max="totalPages" placeholder="페이지" />
+        <button class="jump-btn" @click="jumpToScrollPage">이동</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
 // public/pdf.worker.min.js 로 서빙 (.js 확장자 → nginx가 application/javascript로 처리)
@@ -62,8 +70,12 @@ const totalPages = ref(0)
 const scale = ref(1.0)
 const viewMode = ref('scroll')
 const currentPage = ref(1)
+const pageInput = ref(1)
+const scrollPageInput = ref(1)
 let pdfDoc = null
 let renderGeneration = 0
+
+watch(currentPage, (v) => { pageInput.value = v })
 
 async function loadPdf(event) {
   const file = event.target.files[0]
@@ -87,12 +99,49 @@ async function loadPdf(event) {
   }
 }
 
+function getVisiblePage() {
+  if (!containerRef.value || !pagesContainerRef.value) return 1
+  const scrollTop = containerRef.value.scrollTop
+  const items = pagesContainerRef.value.querySelectorAll('.page-item')
+  for (const item of items) {
+    if (item.offsetTop + item.offsetHeight > scrollTop) {
+      return parseInt(item.dataset.page) || 1
+    }
+  }
+  return 1
+}
+
+function scrollToPage(pageNum) {
+  const item = pagesContainerRef.value?.querySelector(`[data-page="${pageNum}"]`)
+  if (item && containerRef.value) {
+    containerRef.value.scrollTop = item.offsetTop
+  }
+}
+
+function jumpToPage() {
+  const p = Math.max(1, Math.min(totalPages.value, Math.round(pageInput.value) || 1))
+  pageInput.value = p
+  currentPage.value = p
+  renderSinglePage(p)
+}
+
+function syncPageInput() {
+  pageInput.value = Math.max(1, Math.min(totalPages.value, Math.round(pageInput.value) || 1))
+}
+
+function jumpToScrollPage() {
+  const p = Math.max(1, Math.min(totalPages.value, Math.round(scrollPageInput.value) || 1))
+  scrollToPage(p)
+}
+
 async function renderAllPages() {
   if (!pdfDoc) return
   if (!pagesContainerRef.value) await nextTick()
   if (!pagesContainerRef.value) return
   const myGen = ++renderGeneration
   const container = pagesContainerRef.value
+  const isFirstRender = !container.innerHTML
+  const savedPage = isFirstRender ? 1 : getVisiblePage()
   container.innerHTML = ''
 
   for (let i = 1; i <= totalPages.value; i++) {
@@ -104,6 +153,7 @@ async function renderAllPages() {
 
     const wrapper = document.createElement('div')
     wrapper.className = 'page-item'
+    wrapper.dataset.page = i
 
     const canvas = document.createElement('canvas')
     canvas.width = viewport.width
@@ -119,6 +169,11 @@ async function renderAllPages() {
 
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
     if (renderGeneration !== myGen) return
+  }
+
+  if (!isFirstRender) {
+    await nextTick()
+    scrollToPage(savedPage)
   }
 }
 
@@ -138,6 +193,7 @@ async function renderSinglePage(pageNum) {
 
   const wrapper = document.createElement('div')
   wrapper.className = 'page-item'
+  wrapper.dataset.page = pageNum
 
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
@@ -290,6 +346,7 @@ async function zoomOut() {
   justify-content: center;
   padding: 16px;
   background: #e5e7eb;
+  position: relative;
 }
 
 .no-pdf {
@@ -359,12 +416,42 @@ async function zoomOut() {
 .nav-btn:disabled { color: #d1d5db; cursor: not-allowed; }
 
 .page-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   padding: 6px 12px;
   border-top: 1px solid #e5e7eb;
   background: #fff;
   font-size: 12px;
   color: #6b7280;
-  text-align: center;
   flex-shrink: 0;
+}
+
+.page-input {
+  width: 44px;
+  text-align: center;
+  padding: 3px 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  font-size: 12px;
+  outline: none;
+}
+.page-input:focus { border-color: #4f46e5; }
+.page-input::-webkit-outer-spin-button,
+.page-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.page-input[type=number] { -moz-appearance: textfield; }
+
+.page-sep { font-size: 12px; color: #374151; }
+
+.page-jump { display: flex; align-items: center; gap: 5px; }
+.jump-btn {
+  padding: 3px 8px;
+  background: #4f46e5;
+  color: #fff;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
 }
 </style>

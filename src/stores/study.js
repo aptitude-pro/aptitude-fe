@@ -8,6 +8,9 @@ export const useStudyStore = defineStore('study', () => {
   const currentStudy = ref(null)
   const ranking = ref([])
   const dashboard = ref(null)
+  const books = ref([])
+  const myLogs = ref([])
+  const todaySummary = ref([])
 
   async function fetchMyStudies() {
     try {
@@ -109,9 +112,85 @@ export const useStudyStore = defineStore('study', () => {
     }
   }
 
+  // ── Books ──
+
+  async function fetchBooks(studyId) {
+    try {
+      const res = await apiClient.get(`/studies/${studyId}/books`)
+      books.value = res.data.data
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
+  async function addBook(studyId, payload) {
+    try {
+      const res = await apiClient.post(`/studies/${studyId}/books`, payload)
+      books.value.unshift(res.data.data)
+      return { success: true, data: res.data.data }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '등록에 실패했습니다.' }
+    }
+  }
+
+  async function deleteBook(studyId, bookId) {
+    try {
+      await apiClient.delete(`/studies/${studyId}/books/${bookId}`)
+      books.value = books.value.filter(b => b.id !== bookId)
+      return { success: true }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '삭제에 실패했습니다.' }
+    }
+  }
+
+  // ── StudyLog ──
+
+  async function fetchMyLogs(studyId, month) {
+    try {
+      const res = await apiClient.get(`/studies/${studyId}/logs`, { params: { month } })
+      myLogs.value = res.data.data
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
+  async function upsertLog(studyId, payload) {
+    try {
+      const res = await apiClient.post(`/studies/${studyId}/logs`, payload)
+      return { success: true, data: res.data.data }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '저장에 실패했습니다.' }
+    }
+  }
+
+  async function deleteLog(studyId, logId) {
+    try {
+      await apiClient.delete(`/studies/${studyId}/logs/${logId}`)
+      myLogs.value = myLogs.value.filter(l => l.id !== logId)
+      return { success: true }
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || '삭제에 실패했습니다.' }
+    }
+  }
+
+  async function fetchTodaySummary(studyId) {
+    try {
+      const res = await apiClient.get(`/studies/${studyId}/logs/today-summary`)
+      todaySummary.value = res.data.data
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
   return {
     myStudies, publicStudies, currentStudy, ranking, dashboard,
+    books, myLogs, todaySummary,
     fetchMyStudies, fetchPublicStudies, fetchStudy, fetchRanking,
-    createStudy, joinStudy, joinPublicStudyById, leaveStudy, fetchDashboard, deleteStudy
+    createStudy, joinStudy, joinPublicStudyById, leaveStudy, fetchDashboard, deleteStudy,
+    fetchBooks, addBook, deleteBook,
+    fetchMyLogs, upsertLog, deleteLog, fetchTodaySummary
   }
 })

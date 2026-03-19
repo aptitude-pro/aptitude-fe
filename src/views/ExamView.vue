@@ -56,6 +56,7 @@
           @save="handleSave"
           @toggleGuess="handleToggleGuess"
           @toggleWrong="handleToggleWrong"
+          @reset="handleResetAll"
         />
       </div>
 
@@ -393,13 +394,24 @@ async function onTimeExpired() {
 
 function handleMark(questionNo, answer) {
   examStore.setAnswer(questionNo, answer)
-  if (!sessionId.startsWith('local-')) {
+  if (!isLocalSession) {
     examStore.saveAnswers(sessionId)
+  } else {
+    saveLocalSessionData()
   }
 }
 
 function handleClear(questionNo) {
   examStore.clearAnswer(questionNo)
+  if (!isLocalSession) {
+    examStore.saveAnswers(sessionId)
+  } else {
+    saveLocalSessionData()
+  }
+}
+
+function handleResetAll() {
+  examStore.resetAll()
   if (!isLocalSession) {
     examStore.saveAnswers(sessionId)
   } else {
@@ -422,7 +434,6 @@ async function handleSubmit(auto = false) {
 
   // 서버 세션 (비-SKCT): 자동채점
   if (!isLocalSession) {
-    submitting.value = true
     const result = await examStore.submitExam(sessionId)
     submitting.value = false
     if (result.success) {
