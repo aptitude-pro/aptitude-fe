@@ -33,7 +33,16 @@
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
         <p>PDF 파일을 업로드해주세요</p>
       </div>
-      <div v-if="pdfLoaded" class="pages-container" ref="pagesContainerRef"></div>
+      <div v-if="isRendering" class="loading-overlay">
+        <div class="spinner" />
+        <span>PDF 로딩 중...</span>
+      </div>
+      <div
+        v-if="pdfLoaded"
+        class="pages-container"
+        ref="pagesContainerRef"
+        :style="{ visibility: isRendering ? 'hidden' : 'visible' }"
+      ></div>
     </div>
 
     <div v-if="pdfLoaded && viewMode === 'page'" class="page-nav">
@@ -46,7 +55,7 @@
     </div>
 
     <div v-if="pdfLoaded && viewMode === 'scroll'" class="page-info">
-      <span>전체 {{ totalPages }}페이지</span>
+      <span>{{ currentVisiblePage }} / {{ totalPages }}페이지</span>
       <div class="page-jump">
         <input type="number" class="page-input" v-model.number="scrollPageInput"
                @keydown.enter="jumpToScrollPage" :min="1" :max="totalPages" placeholder="페이지" />
@@ -63,19 +72,31 @@ import * as pdfjsLib from 'pdfjs-dist'
 // public/pdf.worker.min.js 로 서빙 (.js 확장자 → nginx가 application/javascript로 처리)
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
+const RENDER_SCALE = 2.0  // 고정 렌더 해상도 — 줌 시 재렌더 없이 CSS scale만 사용
+
 const containerRef = ref(null)
 const pagesContainerRef = ref(null)
 const pdfLoaded = ref(false)
+const isRendering = ref(false)
 const totalPages = ref(0)
 const scale = ref(1.0)
 const viewMode = ref('scroll')
 const currentPage = ref(1)
 const pageInput = ref(1)
 const scrollPageInput = ref(1)
+const currentVisiblePage = ref(1)
 let pdfDoc = null
 let renderGeneration = 0
+let naturalPageWidth = 0
 
 watch(currentPage, (v) => { pageInput.value = v })
+
+function setupScrollListener() {
+  if (!containerRef.value) return
+  containerRef.value.addEventListener('scroll', () => {
+    currentVisiblePage.value = getVisiblePage()
+  }, { passive: true })
+}
 
 async function loadPdf(event) {
   const file = event.target.files[0]
@@ -87,6 +108,7 @@ async function loadPdf(event) {
     totalPages.value = pdfDoc.numPages
     pdfLoaded.value = true
     await nextTick()
+    setupScrollListener()
     if (viewMode.value === 'scroll') {
       await renderAllPages()
     } else {
@@ -101,20 +123,39 @@ async function loadPdf(event) {
 
 function getVisiblePage() {
   if (!containerRef.value || !pagesContainerRef.value) return 1
-  const scrollTop = containerRef.value.scrollTop
+  const container = containerRef.value
+  const centerY = container.scrollTop + container.clientHeight / 2
   const items = pagesContainerRef.value.querySelectorAll('.page-item')
+  let best = null
   for (const item of items) {
-    if (item.offsetTop + item.offsetHeight > scrollTop) {
-      return parseInt(item.dataset.page) || 1
+    if (item.offsetTop <= centerY) {
+      best = item
+    } else {
+      break
     }
   }
-  return 1
+  return parseInt((best || items[0])?.dataset.page) || 1
+}
+
+function applyZoom() {
+  if (!pagesContainerRef.value) return
+  if (naturalPageWidth > 0) {
+    const displayWidth = naturalPageWidth / RENDER_SCALE * scale.value * 2
+    pagesContainerRef.value.style.width = displayWidth + 'px'
+  }
+  const canvases = pagesContainerRef.value.querySelectorAll('canvas')
+  canvases.forEach(canvas => {
+    const w = canvas.width
+    const h = canvas.height
+    canvas.style.width = (w / RENDER_SCALE * scale.value * 2) + 'px'
+    canvas.style.height = (h / RENDER_SCALE * scale.value * 2) + 'px'
+  })
 }
 
 function scrollToPage(pageNum) {
   const item = pagesContainerRef.value?.querySelector(`[data-page="${pageNum}"]`)
-  if (item && containerRef.value) {
-    containerRef.value.scrollTop = item.offsetTop
+  if (item && containerRef.value && pagesContainerRef.value) {
+    containerRef.value.scrollTop = pagesContainerRef.value.offsetTop + item.offsetTop
   }
 }
 
@@ -138,18 +179,26 @@ async function renderAllPages() {
   if (!pdfDoc) return
   if (!pagesContainerRef.value) await nextTick()
   if (!pagesContainerRef.value) return
+
   const myGen = ++renderGeneration
   const container = pagesContainerRef.value
-  const isFirstRender = !container.innerHTML
-  const savedPage = isFirstRender ? 1 : getVisiblePage()
+  isRendering.value = true
   container.innerHTML = ''
 
-  for (let i = 1; i <= totalPages.value; i++) {
-    if (renderGeneration !== myGen) return
-    const page = await pdfDoc.getPage(i)
-    if (renderGeneration !== myGen) return
+  const firstThird = Math.ceil(totalPages.value / 3)
+  const renderTasks = []
 
-    const viewport = page.getViewport({ scale: scale.value * 1.5 })
+  for (let i = 1; i <= totalPages.value; i++) {
+    if (renderGeneration !== myGen) { isRendering.value = false; return }
+    const page = await pdfDoc.getPage(i)
+    if (renderGeneration !== myGen) { isRendering.value = false; return }
+
+    const viewport = page.getViewport({ scale: RENDER_SCALE })
+
+    if (i === 1) {
+      naturalPageWidth = viewport.width
+      applyZoom()
+    }
 
     const wrapper = document.createElement('div')
     wrapper.className = 'page-item'
@@ -158,6 +207,8 @@ async function renderAllPages() {
     const canvas = document.createElement('canvas')
     canvas.width = viewport.width
     canvas.height = viewport.height
+    canvas.style.width = (viewport.width / RENDER_SCALE * scale.value * 2) + 'px'
+    canvas.style.height = (viewport.height / RENDER_SCALE * scale.value * 2) + 'px'
 
     const label = document.createElement('div')
     label.className = 'page-label'
@@ -167,14 +218,17 @@ async function renderAllPages() {
     wrapper.appendChild(label)
     container.appendChild(wrapper)
 
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-    if (renderGeneration !== myGen) return
+    renderTasks.push(
+      page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+    )
+
+    if (i === firstThird) {
+      await Promise.all(renderTasks.slice())
+      if (renderGeneration === myGen) isRendering.value = false
+    }
   }
 
-  if (!isFirstRender) {
-    await nextTick()
-    scrollToPage(savedPage)
-  }
+  if (renderGeneration === myGen) await Promise.all(renderTasks)
 }
 
 async function renderSinglePage(pageNum) {
@@ -183,13 +237,15 @@ async function renderSinglePage(pageNum) {
   if (!pagesContainerRef.value) return
   const myGen = ++renderGeneration
   const container = pagesContainerRef.value
+  isRendering.value = true
   container.innerHTML = ''
 
-  if (renderGeneration !== myGen) return
+  if (renderGeneration !== myGen) { isRendering.value = false; return }
   const page = await pdfDoc.getPage(pageNum)
-  if (renderGeneration !== myGen) return
+  if (renderGeneration !== myGen) { isRendering.value = false; return }
 
-  const viewport = page.getViewport({ scale: scale.value * 1.5 })
+  const viewport = page.getViewport({ scale: RENDER_SCALE })
+  naturalPageWidth = viewport.width
 
   const wrapper = document.createElement('div')
   wrapper.className = 'page-item'
@@ -198,10 +254,16 @@ async function renderSinglePage(pageNum) {
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
   canvas.height = viewport.height
+  canvas.style.width = (viewport.width / RENDER_SCALE * scale.value * 2) + 'px'
+  canvas.style.height = (viewport.height / RENDER_SCALE * scale.value * 2) + 'px'
 
   wrapper.appendChild(canvas)
   container.appendChild(wrapper)
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+
+  if (renderGeneration !== myGen) { isRendering.value = false; return }
+  isRendering.value = false
+  applyZoom()
 }
 
 function prevPage() {
@@ -228,22 +290,31 @@ async function setMode(mode) {
   }
 }
 
-async function zoomIn() {
-  scale.value = Math.min(scale.value + 0.15, 3.0)
-  if (viewMode.value === 'scroll') {
-    await renderAllPages()
-  } else {
-    await renderSinglePage(currentPage.value)
-  }
+function zoomWithScrollPreserve(newScale) {
+  const container = containerRef.value
+  if (!container) { scale.value = newScale; applyZoom(); return }
+
+  const oldScrollHeight = container.scrollHeight
+  const oldScrollTop = container.scrollTop
+
+  scale.value = newScale
+  applyZoom()
+
+  // applyZoom이 DOM을 바꿨으므로 nextTick 후 비율 복원
+  nextTick(() => {
+    const newScrollHeight = container.scrollHeight
+    if (oldScrollHeight > 0) {
+      container.scrollTop = (oldScrollTop / oldScrollHeight) * newScrollHeight
+    }
+  })
 }
 
-async function zoomOut() {
-  scale.value = Math.max(scale.value - 0.15, 0.5)
-  if (viewMode.value === 'scroll') {
-    await renderAllPages()
-  } else {
-    await renderSinglePage(currentPage.value)
-  }
+function zoomIn() {
+  zoomWithScrollPreserve(Math.min(scale.value + 0.15, 3.0))
+}
+
+function zoomOut() {
+  zoomWithScrollPreserve(Math.max(scale.value - 0.15, 0.5))
 }
 </script>
 
@@ -361,12 +432,36 @@ async function zoomOut() {
 }
 .no-pdf p { font-size: 14px; }
 
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 10;
+  gap: 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .pages-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  width: fit-content;
 }
 
 .page-item {
