@@ -15,6 +15,18 @@
       </div>
 
       <div class="form-group">
+        <label>시험 유형</label>
+        <div class="exam-type-btns">
+          <button
+            v-for="t in ['SKCT', 'GSAT']" :key="t"
+            :class="['type-btn', { active: selectedExamType === t }]"
+            @click="selectedExamType = t"
+            type="button"
+          >{{ t }}</button>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label>영역별 문제 수</label>
         <div class="category-inputs">
           <div v-for="cat in categories" :key="cat" class="category-row">
@@ -39,10 +51,10 @@
       <div class="modal-actions">
         <button v-if="existingLog" class="btn-danger-outline" @click="handleDelete" :disabled="saving">삭제</button>
         <div class="right-actions">
-          <button class="btn-secondary" @click="$emit('close')">취소</button>
           <button class="btn-primary" @click="handleSave" :disabled="saving">
             {{ saving ? '저장 중...' : '저장' }}
           </button>
+          <button class="btn-secondary" @click="$emit('close')">취소</button>
         </div>
       </div>
     </div>
@@ -64,7 +76,9 @@ const emit = defineEmits(['close', 'saved', 'deleted'])
 
 const saving = ref(false)
 
-const categories = computed(() => EXAM_CATEGORIES[props.examType] || [])
+const selectedExamType = ref('SKCT')
+
+const categories = computed(() => EXAM_CATEGORIES[selectedExamType.value] || [])
 
 const formattedDate = computed(() => {
   const [y, m, d] = props.date.split('-')
@@ -79,6 +93,14 @@ const form = ref({
 
 // Initialize from existingLog
 watch(() => props.existingLog, (log) => {
+  if (log?.categories?.length) {
+    // 역추론: 로그에 있는 카테고리명으로 유형 감지
+    const logCatNames = log.categories.map(c => c.categoryName)
+    const gsatCats = EXAM_CATEGORIES['GSAT'] || []
+    const matchesGsat = logCatNames.some(n => gsatCats.includes(n))
+    selectedExamType.value = matchesGsat ? 'GSAT' : 'SKCT'
+  }
+
   const catMap = {}
   categories.value.forEach(c => { catMap[c] = 0 })
   if (log) {
@@ -171,6 +193,24 @@ async function handleDelete() {
 }
 .form-group select:focus,
 .form-group textarea:focus { border-color: var(--primary); }
+
+.exam-type-btns { display: flex; gap: 8px; }
+.type-btn {
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.type-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #eff6ff;
+}
 
 .category-inputs { display: flex; flex-direction: column; gap: 8px; }
 .category-row {

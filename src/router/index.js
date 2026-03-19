@@ -56,6 +56,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/my/study-log',
+      name: 'MyStudyLog',
+      component: () => import('@/views/MyStudyLogView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/timer',
       name: 'Timer',
       component: () => import('@/views/TimerView.vue')

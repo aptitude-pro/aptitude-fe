@@ -10,6 +10,7 @@ export const useStudyStore = defineStore('study', () => {
   const dashboard = ref(null)
   const books = ref([])
   const myLogs = ref([])
+  const memberLogs = ref([])
   const todaySummary = ref([])
 
   async function fetchMyStudies() {
@@ -175,6 +176,16 @@ export const useStudyStore = defineStore('study', () => {
     }
   }
 
+  async function fetchMemberLogs(studyId, month) {
+    try {
+      const res = await apiClient.get(`/studies/${studyId}/logs/members`, { params: { month } })
+      memberLogs.value = res.data.data || []
+      return { success: true }
+    } catch (_) {
+      return { success: false }
+    }
+  }
+
   async function fetchTodaySummary(studyId) {
     try {
       const res = await apiClient.get(`/studies/${studyId}/logs/today-summary`)
@@ -187,10 +198,10 @@ export const useStudyStore = defineStore('study', () => {
 
   return {
     myStudies, publicStudies, currentStudy, ranking, dashboard,
-    books, myLogs, todaySummary,
+    books, myLogs, memberLogs, todaySummary,
     fetchMyStudies, fetchPublicStudies, fetchStudy, fetchRanking,
     createStudy, joinStudy, joinPublicStudyById, leaveStudy, fetchDashboard, deleteStudy,
     fetchBooks, addBook, deleteBook,
-    fetchMyLogs, upsertLog, deleteLog, fetchTodaySummary
+    fetchMyLogs, upsertLog, deleteLog, fetchMemberLogs, fetchTodaySummary
   }
 })

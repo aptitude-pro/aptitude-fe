@@ -146,10 +146,10 @@
           </div>
           <p v-if="joinError" class="error-msg">{{ joinError }}</p>
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="showJoinModal = false">취소</button>
             <button type="submit" class="btn-primary" :disabled="joinLoading">
               {{ joinLoading ? '참가 중...' : '참가하기' }}
             </button>
+            <button type="button" class="btn-secondary" @click="showJoinModal = false">취소</button>
           </div>
         </form>
       </div>

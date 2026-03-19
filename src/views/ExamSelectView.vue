@@ -98,10 +98,10 @@
 
         <p class="dialog-hint">시험 중 새로고침을 해도 답안이 자동저장됩니다.<br>시험 시간은 응시 화면 안에서 설정할 수 있습니다.</p>
         <div class="dialog-actions">
-          <button class="btn-secondary" @click="showStartDialog = false">취소</button>
           <button class="btn-primary" @click="confirmStart" :disabled="starting">
             {{ starting ? '준비 중...' : '시험 시작' }}
           </button>
+          <button class="btn-secondary" @click="showStartDialog = false">취소</button>
         </div>
       </div>
     </div>

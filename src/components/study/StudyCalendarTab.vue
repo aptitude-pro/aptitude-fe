@@ -21,62 +21,88 @@
           :class="['cal-cell', {
             'other-month': !cell.inMonth,
             'today': cell.isToday,
-            'has-log': cell.log,
-            'clickable': cell.inMonth
+            'has-log': cell.hasLog,
+            'clickable': cell.inMonth && cell.hasLog
           }]"
-          @click="cell.inMonth && openModal(cell)"
+          @click="cell.inMonth && cell.hasLog && openDayDetail(cell)"
         >
           <span class="cell-day">{{ cell.day }}</span>
-          <template v-if="cell.log">
-            <span class="log-dot"></span>
-            <span class="log-total">{{ cell.log.totalProblems }}문제</span>
+          <template v-if="cell.logs && cell.logs.length">
+            <div class="member-chips">
+              <span
+                v-for="m in cell.logs"
+                :key="m.userId"
+                :class="['member-chip', { 'my-chip': m.userId === myUserId }]"
+                :title="m.nickname + ' · ' + m.totalProblems + '문제'"
+              >
+                {{ m.nickname?.charAt(0) }}·{{ m.totalProblems }}
+              </span>
+            </div>
           </template>
         </div>
       </div>
     </div>
 
-    <!-- 학습 기록 모달 -->
-    <StudyLogModal
-      v-if="modalDate"
-      :date="modalDate"
-      :examType="examType"
-      :books="books"
-      :existingLog="selectedLog"
-      @close="modalDate = null"
-      @saved="onSaved"
-      @deleted="onDeleted"
-    />
+    <!-- 팀원 기록 상세 팝업 -->
+    <div v-if="selectedDayLogs" class="modal-overlay" @click.self="selectedDayLogs = null">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ selectedDayLabel }} 학습 현황</h3>
+          <button class="close-btn" @click="selectedDayLogs = null">✕</button>
+        </div>
+        <div class="day-log-list">
+          <div v-for="m in selectedDayLogs" :key="m.userId" class="day-log-item">
+            <div class="day-log-top">
+              <div class="log-avatar" :class="{ 'my-avatar': m.userId === myUserId }">{{ m.nickname?.charAt(0) }}</div>
+              <div class="log-name-wrap">
+                <span class="log-name">{{ m.userId === myUserId ? `나 (${m.nickname})` : m.nickname }}</span>
+                <span class="log-book">{{ m.bookTitle ? `[${m.bookTitle}]` : '[책 없이]' }}</span>
+              </div>
+              <span class="log-total-num">총 {{ m.totalProblems }}문제</span>
+            </div>
+            <div class="log-cats" v-if="m.categories?.length">
+              <span v-for="c in m.categories" :key="c.categoryName" class="cat-chip">
+                {{ c.categoryName }} {{ c.problemCount }}
+              </span>
+            </div>
+          </div>
+          <div v-if="!selectedDayLogs.length" class="empty">기록이 없습니다</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useStudyStore } from '@/stores/study'
-import StudyLogModal from './StudyLogModal.vue'
 
 const props = defineProps({
   studyId: { type: [String, Number], required: true },
   examType: { type: String, required: true },
-  books: { type: Array, default: () => [] }
+  books: { type: Array, default: () => [] },
+  memberLogs: { type: Array, default: () => [] },
+  myUserId: { type: [String, Number], default: null }
 })
 
 const studyStore = useStudyStore()
 
 const today = new Date()
 const currentYear = ref(today.getFullYear())
-const currentMonth = ref(today.getMonth() + 1)  // 1-12
+const currentMonth = ref(today.getMonth() + 1)
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 
-const modalDate = ref(null)
-const selectedLog = ref(null)
+const selectedDayLogs = ref(null)
+const selectedDayLabel = ref('')
 
-const myLogs = computed(() => studyStore.myLogs)
-
-// Build a map: 'YYYY-MM-DD' → log
-const logMap = computed(() => {
+// Build a map: 'YYYY-MM-DD' → [memberLog, ...]
+const allLogMap = computed(() => {
   const map = {}
-  myLogs.value.forEach(l => { map[l.logDate] = l })
+  props.memberLogs.forEach(l => {
+    if (!map[l.logDate]) map[l.logDate] = []
+    map[l.logDate].push(l)
+  })
   return map
 })
 
@@ -91,28 +117,27 @@ const calendarCells = computed(() => {
   const todayStr = formatDate(today)
   const cells = []
 
-  // Prev month padding
   for (let i = firstDay - 1; i >= 0; i--) {
-    cells.push({ key: `prev-${i}`, day: daysInPrev - i, inMonth: false, isToday: false, log: null })
+    cells.push({ key: `prev-${i}`, day: daysInPrev - i, inMonth: false, isToday: false, logs: null, hasLog: false })
   }
 
-  // Current month
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+    const logs = allLogMap.value[dateStr] || null
     cells.push({
       key: dateStr,
       day: d,
       inMonth: true,
       isToday: dateStr === todayStr,
       dateStr,
-      log: logMap.value[dateStr] || null
+      logs,
+      hasLog: !!(logs && logs.length)
     })
   }
 
-  // Next month padding (fill to complete last row)
   const remaining = (7 - (cells.length % 7)) % 7
   for (let i = 1; i <= remaining; i++) {
-    cells.push({ key: `next-${i}`, day: i, inMonth: false, isToday: false, log: null })
+    cells.push({ key: `next-${i}`, day: i, inMonth: false, isToday: false, logs: null, hasLog: false })
   }
 
   return cells
@@ -129,12 +154,13 @@ function monthStr() {
   return `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}`
 }
 
+const emit = defineEmits(['month-change'])
+
 async function loadLogs() {
-  await studyStore.fetchMyLogs(props.studyId, monthStr())
+  emit('month-change', monthStr())
 }
 
 onMounted(loadLogs)
-
 watch([currentYear, currentMonth], loadLogs)
 
 function prevMonth() {
@@ -155,29 +181,10 @@ function nextMonth() {
   }
 }
 
-function openModal(cell) {
-  modalDate.value = cell.dateStr
-  selectedLog.value = cell.log || null
-}
-
-async function onSaved(payload) {
-  const result = await studyStore.upsertLog(props.studyId, payload)
-  if (result.success) {
-    modalDate.value = null
-    await loadLogs()
-  } else {
-    alert(result.message || '저장에 실패했습니다.')
-  }
-}
-
-async function onDeleted(logId) {
-  const result = await studyStore.deleteLog(props.studyId, logId)
-  if (result.success) {
-    modalDate.value = null
-    await loadLogs()
-  } else {
-    alert(result.message || '삭제에 실패했습니다.')
-  }
+function openDayDetail(cell) {
+  selectedDayLogs.value = cell.logs || []
+  const [y, m, d] = cell.dateStr.split('-')
+  selectedDayLabel.value = `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
 }
 </script>
 
@@ -234,7 +241,7 @@ async function onDeleted(logId) {
 }
 
 .cal-cell {
-  min-height: 60px;
+  min-height: 80px;
   border-radius: 8px;
   padding: 6px 5px;
   display: flex;
@@ -265,19 +272,88 @@ async function onDeleted(logId) {
 
 .cell-day { font-size: 13px; font-weight: 500; line-height: 24px; }
 
-.log-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--primary);
-  flex-shrink: 0;
+.member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  width: 100%;
 }
 
-.log-total {
+.member-chip {
   font-size: 10px;
-  color: var(--primary);
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 1px 5px;
   font-weight: 600;
-  text-align: center;
-  line-height: 1.2;
+  white-space: nowrap;
 }
+
+.member-chip.my-chip {
+  background: #4f46e5;
+  color: #fff;
+}
+
+/* 팝업 모달 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 600;
+}
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.close-btn { background: none; border: none; font-size: 16px; color: var(--text-muted); cursor: pointer; }
+
+.day-log-list { display: flex; flex-direction: column; gap: 12px; }
+.day-log-item {
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.day-log-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.log-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.log-avatar.my-avatar { background: #4f46e5; }
+.log-name-wrap { flex: 1; }
+.log-name { display: block; font-size: 14px; font-weight: 600; }
+.log-book { font-size: 12px; color: var(--text-muted); }
+.log-total-num { font-size: 15px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+.log-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.cat-chip {
+  font-size: 11px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
 </style>

@@ -81,6 +81,14 @@ export const useResultStore = defineStore('result', () => {
     }
   }
 
+  async function fetchDraftCount() {
+    try {
+      const res = await apiClient.get('/results')
+      const data = res.data.data.content || res.data.data
+      return data.filter(r => r.isDraft).length
+    } catch { return 0 }
+  }
+
   async function deleteResult(id) {
     try {
       await apiClient.delete(`/results/${id}`)
@@ -109,6 +117,6 @@ export const useResultStore = defineStore('result', () => {
   return {
     results, currentResult, growthData, categoryData, stats,
     fetchResults, fetchResult, fetchGrowthData, fetchCategoryData, fetchStats,
-    saveManualResult, updateManualResult, deleteResult
+    saveManualResult, updateManualResult, deleteResult, fetchDraftCount
   }
 })

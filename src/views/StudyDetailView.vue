@@ -21,18 +21,21 @@
     </div>
 
     <div class="tabs">
-      <button :class="['tab', { active: tab === 'ranking' }]" @click="tab = 'ranking'">랭킹</button>
-      <button :class="['tab', { active: tab === 'board' }]" @click="tab = 'board'">공지 게시판</button>
-      <button :class="['tab', { active: tab === 'members' }]" @click="tab = 'members'">멤버</button>
-      <button :class="['tab', { active: tab === 'dashboard' }]" @click="onDashboardTab">대시보드</button>
-      <button :class="['tab', { active: tab === 'books' }]" @click="onBooksTab">책 목록</button>
       <button :class="['tab', { active: tab === 'calendar' }]" @click="onCalendarTab">학습 기록</button>
+      <button :class="['tab', { active: tab === 'dashboard' }]" @click="onDashboardTab">대시보드</button>
+      <button :class="['tab', { active: tab === 'ranking' }]" @click="tab = 'ranking'">성적</button>
+      <button :class="['tab', { active: tab === 'board' }]" @click="tab = 'board'">공지</button>
+      <button :class="['tab', { active: tab === 'members' }]" @click="tab = 'members'">멤버</button>
+      <button :class="['tab', { active: tab === 'books' }]" @click="onBooksTab">교재</button>
     </div>
 
-    <!-- 랭킹 탭 -->
+    <!-- 성적 탭 -->
     <div v-if="tab === 'ranking'" class="tab-panel">
       <div class="card">
-        <h3>스터디 랭킹</h3>
+        <div class="card-header-row">
+          <h3>내 성적 현황</h3>
+        </div>
+        <div class="score-notice">시험 점수는 본인만 확인 가능합니다</div>
         <div v-if="ranking.length === 0" class="empty">아직 성적 데이터가 없습니다</div>
         <div v-else class="ranking-list">
           <div v-for="(member, idx) in ranking" :key="member.userId" class="ranking-item">
@@ -92,22 +95,7 @@
 
     <!-- 대시보드 탭 -->
     <div v-if="tab === 'dashboard'" class="tab-panel">
-      <!-- 멤버별 응시 횟수 -->
-      <div class="card">
-        <h3>멤버별 응시 횟수</h3>
-        <div v-if="!dashboard || dashboard.memberStats.length === 0" class="empty">데이터가 없습니다</div>
-        <div v-else class="member-bars">
-          <div v-for="m in dashboard.memberStats" :key="m.userId" class="member-bar-row">
-            <span class="mb-name">{{ m.nickname }}</span>
-            <div class="mb-bar-wrap">
-              <div class="mb-bar" :style="{ width: barWidth(m.examCount) + '%' }"></div>
-            </div>
-            <span class="mb-count">{{ m.examCount }}회</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 오늘 학습 현황 -->
+      <!-- 오늘 학습 현황 (최상단) -->
       <div class="card">
         <h3>오늘 학습 현황</h3>
         <div v-if="todaySummaryLoading" class="empty">불러오는 중...</div>
@@ -132,6 +120,21 @@
               <span v-if="m.hasLog" class="tm-total-num">{{ m.totalProblems }}<small>문제</small></span>
               <span v-else class="tm-total-dash">—</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 멤버별 응시 횟수 -->
+      <div class="card">
+        <h3>멤버별 응시 횟수</h3>
+        <div v-if="!dashboard || dashboard.memberStats.length === 0" class="empty">데이터가 없습니다</div>
+        <div v-else class="member-bars">
+          <div v-for="m in dashboard.memberStats" :key="m.userId" class="member-bar-row">
+            <span class="mb-name">{{ m.nickname }}</span>
+            <div class="mb-bar-wrap">
+              <div class="mb-bar" :style="{ width: barWidth(m.examCount) + '%' }"></div>
+            </div>
+            <span class="mb-count">{{ m.examCount }}회</span>
           </div>
         </div>
       </div>
@@ -166,6 +169,9 @@
         :studyId="studyId"
         :examType="study.examType"
         :books="studyStore.books"
+        :memberLogs="studyStore.memberLogs"
+        :myUserId="myUserId"
+        @month-change="onCalendarMonthChange"
       />
     </div>
 
@@ -182,8 +188,8 @@
           <textarea v-model="noticeForm.content" placeholder="내용 입력..." rows="4"></textarea>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="showNoticeModal = false">취소</button>
           <button class="btn-primary" @click="submitNotice">등록</button>
+          <button class="btn-secondary" @click="showNoticeModal = false">취소</button>
         </div>
       </div>
     </div>
@@ -204,7 +210,7 @@ const route = useRoute()
 const router = useRouter()
 const studyStore = useStudyStore()
 const authStore = useAuthStore()
-const tab = ref('ranking')
+const tab = ref('calendar')
 const showNoticeModal = ref(false)
 const notices = ref([])
 const noticeForm = ref({ title: '', content: '' })
@@ -225,7 +231,8 @@ onMounted(async () => {
   const id = route.params.id
   await Promise.all([
     studyStore.fetchStudy(id),
-    studyStore.fetchRanking(id)
+    studyStore.fetchRanking(id),
+    studyStore.fetchBooks(id)
   ])
   try {
     const res = await apiClient.get(`/studies/${id}/notices`)
@@ -253,10 +260,10 @@ async function onBooksTab() {
 
 async function onCalendarTab() {
   tab.value = 'calendar'
-  // Books are needed for the log modal; load if not yet loaded
-  if (studyStore.books.length === 0) {
-    await studyStore.fetchBooks(route.params.id)
-  }
+}
+
+async function onCalendarMonthChange(month) {
+  await studyStore.fetchMemberLogs(route.params.id, month)
 }
 
 function barWidth(count) {
@@ -390,6 +397,15 @@ function formatDate(d) {
 .card-header-row h3 { margin-bottom: 0; }
 
 .empty { padding: 30px; text-align: center; color: var(--text-light); font-size: 14px; }
+
+.score-notice {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
 
 .ranking-list { display: flex; flex-direction: column; gap: 8px; }
 .ranking-item {

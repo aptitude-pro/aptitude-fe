@@ -505,6 +505,15 @@ function buildDraftQuestions() {
 
 async function saveDraftToDb() {
   if (!authStore.isLoggedIn) return
+
+  if (!retryResultId) {
+    const count = await resultStore.fetchDraftCount()
+    if (count >= 2) {
+      alert('임시저장은 최대 2개까지 가능합니다.\n기존 임시저장을 삭제하거나 제출 후 다시 시도해주세요.')
+      return
+    }
+  }
+
   const draftScores = Object.fromEntries(
     ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'].map(c => [c, 0])
   )
