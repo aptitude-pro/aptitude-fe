@@ -163,7 +163,6 @@
         :memberLogs="studyStore.memberLogs"
         :members="study?.members || []"
         :myUserId="myUserId"
-        :myPersonalLogs="myPersonalLogs"
         @month-change="onCalendarMonthChange"
       />
     </div>
@@ -211,7 +210,6 @@ const todaySummaryLoading = ref(false)
 
 const joinLoading = ref(false)
 const codeCopied = ref(false)
-const myPersonalLogs = ref([])
 
 const studyId = computed(() => route.params.id)
 const study = computed(() => studyStore.currentStudy)
@@ -271,11 +269,7 @@ async function onCalendarTab() {
 }
 
 async function onCalendarMonthChange(month) {
-  const [, myLogsRes] = await Promise.all([
-    studyStore.fetchMemberLogs(route.params.id, month),
-    apiClient.get('/my/logs', { params: { month } }).catch(() => ({ data: { data: [] } }))
-  ])
-  myPersonalLogs.value = myLogsRes.data.data || []
+  await studyStore.fetchMemberLogs(route.params.id, month)
 }
 
 function barWidth(count) {

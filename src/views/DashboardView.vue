@@ -84,6 +84,12 @@
       </div>
     </div>
 
+    <!-- 활동 잔디 -->
+    <div class="card heatmap-card">
+      <h3>활동 기록</h3>
+      <ActivityHeatmap :data="resultStore.activityData" />
+    </div>
+
     <!-- 최근 응시 기록 & 영역별 점수 -->
     <div class="bottom-grid">
       <div class="card">
@@ -135,6 +141,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useResultStore } from '@/stores/result'
 import ScoreLineChart from '@/components/dashboard/ScoreLineChart.vue'
 import CategoryRadarChart from '@/components/dashboard/CategoryRadarChart.vue'
+import ActivityHeatmap from '@/components/dashboard/ActivityHeatmap.vue'
 
 const auth = useAuthStore()
 const resultStore = useResultStore()
@@ -151,6 +158,7 @@ onMounted(async () => {
     resultStore.fetchGrowthData(),
     resultStore.fetchCategoryData()
   ])
+  resultStore.fetchActivityData()
 })
 
 const statCards = computed(() => [
@@ -363,6 +371,15 @@ function formatDate(dateStr) {
 .empty-state p { font-size: 14px; font-weight: 500; }
 .empty-state span { font-size: 12px; }
 .empty-state.small { padding: 30px 0; }
+
+.heatmap-card {
+  margin-bottom: 24px;
+}
+.heatmap-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
 
 .bottom-grid {
   display: grid;

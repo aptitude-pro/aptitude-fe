@@ -27,7 +27,7 @@
           @click="cell.inMonth && openDayDetail(cell)"
         >
           <span class="cell-day">{{ cell.day }}</span>
-          <template v-if="(cell.logs && cell.logs.length) || myPersonalLogMap[cell.dateStr]">
+          <template v-if="cell.logs && cell.logs.length">
             <div class="member-chips">
               <span
                 v-for="m in (cell.logs || [])"
@@ -35,13 +35,8 @@
                 :class="['member-chip', { 'my-chip': m.userId === myUserId }]"
                 :title="m.nickname + ' · ' + m.totalProblems + '문제'"
               >
-                {{ m.nickname?.charAt(0) }}·{{ m.totalProblems }}
+                {{ m.nickname }}·{{ m.totalProblems }}
               </span>
-              <span
-                v-if="myPersonalLogMap[cell.dateStr]"
-                class="member-chip personal-log-chip"
-                :title="'개인 기록 · ' + myPersonalLogMap[cell.dateStr].totalProblems + '문제'"
-              >📝{{ myPersonalLogMap[cell.dateStr].totalProblems }}</span>
             </div>
           </template>
         </div>
@@ -73,17 +68,6 @@
             </div>
           </div>
           <div v-if="!selectedDayLogs.length" class="empty">기록이 없습니다</div>
-        </div>
-        <div v-if="selectedCell && myPersonalLogMap[selectedCell.dateStr]" class="personal-log-section">
-          <h4>📝 내 개인 기록</h4>
-          <div class="personal-log-total">총 {{ myPersonalLogMap[selectedCell.dateStr].totalProblems }}문제</div>
-          <div class="log-cats" v-if="myPersonalLogMap[selectedCell.dateStr].categories?.length">
-            <span
-              v-for="c in myPersonalLogMap[selectedCell.dateStr].categories"
-              :key="c.categoryName"
-              class="cat-chip personal-cat"
-            >{{ c.categoryName }} {{ c.problemCount }}</span>
-          </div>
         </div>
         <div class="my-log-section">
           <button class="btn-my-log" @click="openMyLogModal">
@@ -117,8 +101,7 @@ const props = defineProps({
   books: { type: Array, default: () => [] },
   memberLogs: { type: Array, default: () => [] },
   members: { type: Array, default: () => [] },
-  myUserId: { type: [String, Number], default: null },
-  myPersonalLogs: { type: Array, default: () => [] }
+  myUserId: { type: [String, Number], default: null }
 })
 
 const studyStore = useStudyStore()
@@ -147,13 +130,6 @@ const allLogMap = computed(() => {
   return map
 })
 
-// Build a map: 'YYYY-MM-DD' → personalLog
-const myPersonalLogMap = computed(() => {
-  const map = {}
-  props.myPersonalLogs.forEach(l => { map[l.logDate] = l })
-  return map
-})
-
 const calendarCells = computed(() => {
   const year = currentYear.value
   const month = currentMonth.value
@@ -179,7 +155,7 @@ const calendarCells = computed(() => {
       isToday: dateStr === todayStr,
       dateStr,
       logs,
-      hasLog: !!(logs && logs.length) || !!myPersonalLogMap.value[dateStr]
+      hasLog: !!(logs && logs.length)
     })
   }
 
@@ -326,7 +302,7 @@ async function handleLogDeleted(logId) {
 }
 
 .cal-cell {
-  min-height: 80px;
+  min-height: 110px;
   border-radius: 8px;
   padding: 6px 5px;
   display: flex;
@@ -366,13 +342,16 @@ async function handleLogDeleted(logId) {
 }
 
 .member-chip {
-  font-size: 10px;
+  font-size: 11px;
   background: #dbeafe;
   color: #1d4ed8;
   border-radius: 10px;
   padding: 1px 5px;
   font-weight: 600;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .member-chip.my-chip {
@@ -466,20 +445,4 @@ async function handleLogDeleted(logId) {
 }
 .btn-my-log:hover { opacity: 0.85; }
 
-.personal-log-chip {
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 10px;
-}
-
-.personal-log-section {
-  margin-top: 14px;
-  padding: 12px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 10px;
-}
-.personal-log-section h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #92400e; }
-.personal-log-total { font-size: 13px; font-weight: 600; color: #78350f; margin-bottom: 6px; }
-.personal-cat { background: #fef3c7; color: #92400e; }
 </style>

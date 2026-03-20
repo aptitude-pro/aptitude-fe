@@ -8,6 +8,7 @@ export const useResultStore = defineStore('result', () => {
   const growthData = ref(null)
   const categoryData = ref(null)
   const stats = ref({ totalCount: 0, avgScore: 0, maxScore: 0, correctRate: 0 })
+  const activityData = ref([])
 
   async function fetchResults(page = 0) {
     try {
@@ -81,6 +82,17 @@ export const useResultStore = defineStore('result', () => {
     }
   }
 
+  async function fetchActivityData() {
+    const to = new Date()
+    const from = new Date()
+    from.setFullYear(from.getFullYear() - 1)
+    const fmt = d => d.toISOString().slice(0, 10)
+    try {
+      const res = await apiClient.get('/stats/activity', { params: { from: fmt(from), to: fmt(to) } })
+      activityData.value = res.data.data || []
+    } catch (_) {}
+  }
+
   async function fetchDraftCount() {
     try {
       const res = await apiClient.get('/results')
@@ -115,8 +127,8 @@ export const useResultStore = defineStore('result', () => {
   }
 
   return {
-    results, currentResult, growthData, categoryData, stats,
+    results, currentResult, growthData, categoryData, stats, activityData,
     fetchResults, fetchResult, fetchGrowthData, fetchCategoryData, fetchStats,
-    saveManualResult, updateManualResult, deleteResult, fetchDraftCount
+    fetchActivityData, saveManualResult, updateManualResult, deleteResult, fetchDraftCount
   }
 })
