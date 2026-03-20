@@ -171,6 +171,7 @@ function confirmReset() {
   justify-content: center;
 }
 
+
 .choice-btn:hover {
   border-color: #1f2937;
   color: #1f2937;
@@ -220,4 +221,27 @@ function confirmReset() {
 .wrong-btn:hover { border-color: #fca5a5; color: #ef4444; }
 .wrong-btn.active { background: #fff1f2; color: #ef4444; border-color: #fca5a5; }
 .omr-row.wronged .q-num { color: #ef4444; }
+
+@media (max-width: 1440px) {
+  .choice-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .guess-btn,
+  .wrong-btn {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  .omr-row {
+    gap: 6px;
+  }
+
+  .choices {
+    gap: 3px;
+  }
+}
 </style>
