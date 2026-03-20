@@ -23,35 +23,9 @@
     <div class="tabs">
       <button :class="['tab', { active: tab === 'calendar' }]" @click="onCalendarTab">학습 기록</button>
       <button :class="['tab', { active: tab === 'dashboard' }]" @click="onDashboardTab">대시보드</button>
-      <button :class="['tab', { active: tab === 'ranking' }]" @click="tab = 'ranking'">성적</button>
       <button :class="['tab', { active: tab === 'board' }]" @click="tab = 'board'">공지</button>
       <button :class="['tab', { active: tab === 'members' }]" @click="tab = 'members'">멤버</button>
       <button :class="['tab', { active: tab === 'books' }]" @click="onBooksTab">교재</button>
-    </div>
-
-    <!-- 성적 탭 -->
-    <div v-if="tab === 'ranking'" class="tab-panel">
-      <div class="card">
-        <div class="card-header-row">
-          <h3>내 성적 현황</h3>
-        </div>
-        <div class="score-notice">시험 점수는 본인만 확인 가능합니다</div>
-        <div v-if="ranking.length === 0" class="empty">아직 성적 데이터가 없습니다</div>
-        <div v-else class="ranking-list">
-          <div v-for="(member, idx) in ranking" :key="member.userId" class="ranking-item">
-            <span :class="['rank-num', { top3: idx < 3 }]">{{ idx + 1 }}</span>
-            <div class="rank-avatar">{{ member.nickname?.charAt(0) }}</div>
-            <div class="rank-info">
-              <span class="rank-name">{{ member.nickname }}</span>
-              <span class="rank-count">{{ member.examCount }}회 응시</span>
-            </div>
-            <div class="rank-score">
-              <span class="best-score">{{ member.bestScore }}점</span>
-              <span class="avg-score">평균 {{ member.avgScore }}점</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 게시판 탭 -->
@@ -124,6 +98,23 @@
         </div>
       </div>
 
+      <!-- 이번 달 멤버별 학습 기록 -->
+      <div class="card">
+        <h3>이번 달 학습 기록</h3>
+        <div v-if="memberMonthlyStats.length === 0" class="empty">이번 달 학습 기록이 없습니다</div>
+        <div v-else class="member-bars">
+          <div v-for="m in memberMonthlyStats" :key="m.userId" class="member-bar-row">
+            <span class="mb-name">{{ m.nickname }}</span>
+            <div class="mb-bar-wrap">
+              <div class="mb-bar study-bar"
+                :style="{ width: (memberMonthlyStats[0].totalProblems > 0 ? Math.round(m.totalProblems / memberMonthlyStats[0].totalProblems * 100) : 0) + '%' }">
+              </div>
+            </div>
+            <span class="mb-count">{{ m.totalProblems }}문제 ({{ m.logCount }}일)</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 멤버별 응시 횟수 -->
       <div class="card">
         <h3>멤버별 응시 횟수</h3>
@@ -170,7 +161,9 @@
         :examType="study.examType"
         :books="studyStore.books"
         :memberLogs="studyStore.memberLogs"
+        :members="study?.members || []"
         :myUserId="myUserId"
+        :myPersonalLogs="myPersonalLogs"
         @month-change="onCalendarMonthChange"
       />
     </div>
@@ -218,12 +211,24 @@ const todaySummaryLoading = ref(false)
 
 const joinLoading = ref(false)
 const codeCopied = ref(false)
+const myPersonalLogs = ref([])
 
 const studyId = computed(() => route.params.id)
 const study = computed(() => studyStore.currentStudy)
-const ranking = computed(() => studyStore.ranking)
 const dashboard = computed(() => studyStore.dashboard)
 const myUserId = computed(() => authStore.user?.id || null)
+
+// 이번 달 멤버별 학습 집계 (StudyLog 기반)
+const memberMonthlyStats = computed(() => {
+  const map = {}
+  studyStore.memberLogs.forEach(log => {
+    const key = String(log.userId)
+    if (!map[key]) map[key] = { userId: log.userId, nickname: log.nickname, totalProblems: 0, logCount: 0 }
+    map[key].totalProblems += log.totalProblems
+    map[key].logCount += 1
+  })
+  return Object.values(map).sort((a, b) => b.totalProblems - a.totalProblems)
+})
 
 const CATEGORY_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 
@@ -231,7 +236,6 @@ onMounted(async () => {
   const id = route.params.id
   await Promise.all([
     studyStore.fetchStudy(id),
-    studyStore.fetchRanking(id),
     studyStore.fetchBooks(id)
   ])
   try {
@@ -242,12 +246,16 @@ onMounted(async () => {
 
 async function onDashboardTab() {
   tab.value = 'dashboard'
+  const id = route.params.id
+  const currentMonth = new Date().toISOString().slice(0, 7)
   if (!studyStore.dashboard) {
-    await studyStore.fetchDashboard(route.params.id)
+    await studyStore.fetchDashboard(id)
   }
-  // Always refresh today summary when opening dashboard
   todaySummaryLoading.value = true
-  await studyStore.fetchTodaySummary(route.params.id)
+  await Promise.all([
+    studyStore.fetchTodaySummary(id),
+    studyStore.fetchMemberLogs(id, currentMonth)
+  ])
   todaySummaryLoading.value = false
 }
 
@@ -263,7 +271,11 @@ async function onCalendarTab() {
 }
 
 async function onCalendarMonthChange(month) {
-  await studyStore.fetchMemberLogs(route.params.id, month)
+  const [, myLogsRes] = await Promise.all([
+    studyStore.fetchMemberLogs(route.params.id, month),
+    apiClient.get('/my/logs', { params: { month } }).catch(() => ({ data: { data: [] } }))
+  ])
+  myPersonalLogs.value = myLogsRes.data.data || []
 }
 
 function barWidth(count) {
@@ -474,6 +486,7 @@ function formatDate(d) {
 .mb-name { font-size: 13px; width: 80px; flex-shrink: 0; font-weight: 500; }
 .mb-bar-wrap { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
 .mb-bar { height: 100%; border-radius: 5px; background: #4f46e5; transition: width 0.6s; }
+.mb-bar.study-bar { background: #10b981; }
 .mb-count { font-size: 12px; font-weight: 600; width: 32px; text-align: right; color: var(--text-muted); }
 
 .chart-wrap { min-height: 200px; display: flex; align-items: center; justify-content: center; }

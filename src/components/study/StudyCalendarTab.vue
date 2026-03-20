@@ -22,21 +22,26 @@
             'other-month': !cell.inMonth,
             'today': cell.isToday,
             'has-log': cell.hasLog,
-            'clickable': cell.inMonth && cell.hasLog
+            'clickable': cell.inMonth
           }]"
-          @click="cell.inMonth && cell.hasLog && openDayDetail(cell)"
+          @click="cell.inMonth && openDayDetail(cell)"
         >
           <span class="cell-day">{{ cell.day }}</span>
-          <template v-if="cell.logs && cell.logs.length">
+          <template v-if="(cell.logs && cell.logs.length) || myPersonalLogMap[cell.dateStr]">
             <div class="member-chips">
               <span
-                v-for="m in cell.logs"
+                v-for="m in (cell.logs || [])"
                 :key="m.userId"
                 :class="['member-chip', { 'my-chip': m.userId === myUserId }]"
                 :title="m.nickname + ' · ' + m.totalProblems + '문제'"
               >
                 {{ m.nickname?.charAt(0) }}·{{ m.totalProblems }}
               </span>
+              <span
+                v-if="myPersonalLogMap[cell.dateStr]"
+                class="member-chip personal-log-chip"
+                :title="'개인 기록 · ' + myPersonalLogMap[cell.dateStr].totalProblems + '문제'"
+              >📝{{ myPersonalLogMap[cell.dateStr].totalProblems }}</span>
             </div>
           </template>
         </div>
@@ -51,16 +56,17 @@
           <button class="close-btn" @click="selectedDayLogs = null">✕</button>
         </div>
         <div class="day-log-list">
-          <div v-for="m in selectedDayLogs" :key="m.userId" class="day-log-item">
+          <div v-for="m in selectedDayLogs" :key="m.userId" class="day-log-item" :class="{ 'no-log-item': !m.hasLog }">
             <div class="day-log-top">
-              <div class="log-avatar" :class="{ 'my-avatar': m.userId === myUserId }">{{ m.nickname?.charAt(0) }}</div>
+              <div class="log-avatar" :class="{ 'my-avatar': m.userId === myUserId, 'no-log-avatar': !m.hasLog }">{{ m.nickname?.charAt(0) }}</div>
               <div class="log-name-wrap">
                 <span class="log-name">{{ m.userId === myUserId ? `나 (${m.nickname})` : m.nickname }}</span>
-                <span class="log-book">{{ m.bookTitle ? `[${m.bookTitle}]` : '[책 없이]' }}</span>
+                <span class="log-book" v-if="m.hasLog">{{ m.bookTitle ? `[${m.bookTitle}]` : '[책 없이]' }}</span>
               </div>
-              <span class="log-total-num">총 {{ m.totalProblems }}문제</span>
+              <span v-if="m.hasLog" class="log-total-num">총 {{ m.totalProblems }}문제</span>
+              <span v-else class="log-no-record">기록 없음</span>
             </div>
-            <div class="log-cats" v-if="m.categories?.length">
+            <div class="log-cats" v-if="m.hasLog && m.categories?.length">
               <span v-for="c in m.categories" :key="c.categoryName" class="cat-chip">
                 {{ c.categoryName }} {{ c.problemCount }}
               </span>
@@ -68,21 +74,51 @@
           </div>
           <div v-if="!selectedDayLogs.length" class="empty">기록이 없습니다</div>
         </div>
+        <div v-if="selectedCell && myPersonalLogMap[selectedCell.dateStr]" class="personal-log-section">
+          <h4>📝 내 개인 기록</h4>
+          <div class="personal-log-total">총 {{ myPersonalLogMap[selectedCell.dateStr].totalProblems }}문제</div>
+          <div class="log-cats" v-if="myPersonalLogMap[selectedCell.dateStr].categories?.length">
+            <span
+              v-for="c in myPersonalLogMap[selectedCell.dateStr].categories"
+              :key="c.categoryName"
+              class="cat-chip personal-cat"
+            >{{ c.categoryName }} {{ c.problemCount }}</span>
+          </div>
+        </div>
+        <div class="my-log-section">
+          <button class="btn-my-log" @click="openMyLogModal">
+            {{ logModalExisting ? '✏️ 내 기록 수정' : '+ 내 기록 남기기' }}
+          </button>
+        </div>
       </div>
     </div>
+
+    <StudyLogModal
+      v-if="showLogModal"
+      :date="logModalDate"
+      :examType="props.examType"
+      :books="props.books"
+      :existingLog="logModalExisting"
+      @close="showLogModal = false"
+      @saved="handleLogSaved"
+      @deleted="handleLogDeleted"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useStudyStore } from '@/stores/study'
+import StudyLogModal from '@/components/study/StudyLogModal.vue'
 
 const props = defineProps({
   studyId: { type: [String, Number], required: true },
   examType: { type: String, required: true },
   books: { type: Array, default: () => [] },
   memberLogs: { type: Array, default: () => [] },
-  myUserId: { type: [String, Number], default: null }
+  members: { type: Array, default: () => [] },
+  myUserId: { type: [String, Number], default: null },
+  myPersonalLogs: { type: Array, default: () => [] }
 })
 
 const studyStore = useStudyStore()
@@ -96,6 +132,11 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const selectedDayLogs = ref(null)
 const selectedDayLabel = ref('')
 
+const showLogModal = ref(false)
+const logModalDate = ref('')
+const logModalExisting = ref(null)
+const selectedCell = ref(null)
+
 // Build a map: 'YYYY-MM-DD' → [memberLog, ...]
 const allLogMap = computed(() => {
   const map = {}
@@ -103,6 +144,13 @@ const allLogMap = computed(() => {
     if (!map[l.logDate]) map[l.logDate] = []
     map[l.logDate].push(l)
   })
+  return map
+})
+
+// Build a map: 'YYYY-MM-DD' → personalLog
+const myPersonalLogMap = computed(() => {
+  const map = {}
+  props.myPersonalLogs.forEach(l => { map[l.logDate] = l })
   return map
 })
 
@@ -131,7 +179,7 @@ const calendarCells = computed(() => {
       isToday: dateStr === todayStr,
       dateStr,
       logs,
-      hasLog: !!(logs && logs.length)
+      hasLog: !!(logs && logs.length) || !!myPersonalLogMap.value[dateStr]
     })
   }
 
@@ -182,9 +230,46 @@ function nextMonth() {
 }
 
 function openDayDetail(cell) {
-  selectedDayLogs.value = cell.logs || []
-  const [y, m, d] = cell.dateStr.split('-')
-  selectedDayLabel.value = `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`
+  selectedCell.value = cell
+
+  const dayLogs = cell.logs || []
+  const logMap = Object.fromEntries(dayLogs.map(l => [String(l.userId), l]))
+
+  if (props.members.length > 0) {
+    selectedDayLogs.value = props.members.map(m => {
+      const log = logMap[String(m.userId)]
+      return log
+        ? { ...log, hasLog: true }
+        : { userId: m.userId, nickname: m.nickname, hasLog: false, totalProblems: 0, categories: [], bookTitle: null }
+    })
+  } else {
+    selectedDayLogs.value = dayLogs.map(l => ({ ...l, hasLog: true }))
+  }
+
+  const myLog = dayLogs.find(l => String(l.userId) === String(props.myUserId))
+  logModalExisting.value = myLog || null
+
+  const [y, mo, d] = cell.dateStr.split('-')
+  selectedDayLabel.value = `${y}년 ${parseInt(mo)}월 ${parseInt(d)}일`
+}
+
+function openMyLogModal() {
+  logModalDate.value = selectedCell.value.dateStr
+  showLogModal.value = true
+}
+
+async function handleLogSaved(payload) {
+  await studyStore.upsertLog(props.studyId, payload)
+  showLogModal.value = false
+  selectedDayLogs.value = null
+  emit('month-change', monthStr())
+}
+
+async function handleLogDeleted(logId) {
+  await studyStore.deleteLog(props.studyId, logId)
+  showLogModal.value = false
+  selectedDayLogs.value = null
+  emit('month-change', monthStr())
 }
 </script>
 
@@ -356,4 +441,45 @@ function openDayDetail(cell) {
   font-weight: 500;
 }
 .empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+.no-log-item { opacity: 0.6; }
+.no-log-avatar { background: #9ca3af !important; }
+.log-no-record { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+
+.my-log-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-my-log {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-my-log:hover { opacity: 0.85; }
+
+.personal-log-chip {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 10px;
+}
+
+.personal-log-section {
+  margin-top: 14px;
+  padding: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+}
+.personal-log-section h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #92400e; }
+.personal-log-total { font-size: 13px; font-weight: 600; color: #78350f; margin-bottom: 6px; }
+.personal-cat { background: #fef3c7; color: #92400e; }
 </style>

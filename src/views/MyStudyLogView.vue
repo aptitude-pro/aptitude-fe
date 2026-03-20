@@ -81,7 +81,7 @@
           :class="['cal-cell', {
             'other-month': !cell.inMonth,
             'today': cell.isToday,
-            'has-log': cell.log,
+            'has-log': cell.log || (studyLogsByDate[cell.dateStr] && studyLogsByDate[cell.dateStr].length > 0),
             'clickable': cell.inMonth
           }]"
           @click="cell.inMonth && openModal(cell)"
@@ -91,6 +91,13 @@
             <span class="log-book-name" v-if="cell.log.bookTitle">{{ cell.log.bookTitle }}</span>
             <span class="log-total">{{ cell.log.totalProblems }}문제</span>
           </template>
+          <span
+            v-for="sl in (studyLogsByDate[cell.dateStr] || [])"
+            :key="sl.id"
+            class="study-log-chip"
+            :title="sl.studyName + ' · ' + sl.totalProblems + '문제'"
+            @click.stop="openStudyLogDetail(sl)"
+          >📚 {{ sl.totalProblems }}</span>
         </div>
       </div>
     </div>
@@ -106,6 +113,27 @@
       @saved="onSaved"
       @deleted="onDeleted"
     />
+
+    <!-- 스터디 기록 상세 팝업 (읽기전용) -->
+    <div v-if="selectedStudyLog" class="modal-overlay" @click.self="selectedStudyLog = null">
+      <div class="modal study-log-detail">
+        <div class="modal-header">
+          <h3>📚 {{ selectedStudyLog.studyName }}</h3>
+          <button class="close-btn" @click="selectedStudyLog = null">✕</button>
+        </div>
+        <p class="detail-date">{{ selectedStudyLog.logDate }} · 총 {{ selectedStudyLog.totalProblems }}문제</p>
+        <div v-if="selectedStudyLog.categories && selectedStudyLog.categories.length" class="detail-cats">
+          <div v-for="c in selectedStudyLog.categories" :key="c.categoryName" class="detail-cat-row">
+            <span class="cat-name">{{ c.categoryName }}</span>
+            <span class="cat-count">{{ c.problemCount }}문제</span>
+          </div>
+        </div>
+        <p v-if="selectedStudyLog.memo" class="detail-memo">{{ selectedStudyLog.memo }}</p>
+        <router-link :to="`/studies/${selectedStudyLog.studyId}`" class="study-link">
+          스터디로 이동 →
+        </router-link>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -122,8 +150,10 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 
 const myBooks = ref([])
 const myLogs = ref([])
+const studyLogsByDate = ref({})
 const modalDate = ref(null)
 const selectedLog = ref(null)
+const selectedStudyLog = ref(null)
 const showBookForm = ref(false)
 const bookLoading = ref(false)
 const examTypes = ['SKCT', 'GSAT', '종합']
@@ -142,8 +172,18 @@ async function loadBooks() {
 
 async function loadLogs() {
   try {
-    const res = await apiClient.get('/my/logs', { params: { month: monthStr() } })
-    myLogs.value = res.data.data || []
+    const month = monthStr()
+    const [logsRes, studyLogsRes] = await Promise.all([
+      apiClient.get('/my/logs', { params: { month } }),
+      apiClient.get('/my/study-logs', { params: { month } })
+    ])
+    myLogs.value = logsRes.data.data || []
+    const map = {}
+    for (const sl of (studyLogsRes.data.data || [])) {
+      if (!map[sl.logDate]) map[sl.logDate] = []
+      map[sl.logDate].push(sl)
+    }
+    studyLogsByDate.value = map
   } catch (_) {}
 }
 
@@ -214,6 +254,10 @@ function nextMonth() {
 function openModal(cell) {
   modalDate.value = cell.dateStr
   selectedLog.value = cell.log || null
+}
+
+function openStudyLogDetail(sl) {
+  selectedStudyLog.value = sl
 }
 
 async function onSaved(payload) {
@@ -442,4 +486,87 @@ async function removeBook(bookId) {
 .btn-primary { background: var(--primary); color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; }
 .btn-primary.sm { padding: 6px 12px; font-size: 12px; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 스터디 기록 칩 */
+.study-log-chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  background: #d1fae5;
+  border-radius: 4px;
+  padding: 2px 5px;
+  width: calc(100% - 4px);
+  text-align: center;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.study-log-chip:hover { background: #a7f3d0; }
+
+/* 스터디 기록 상세 모달 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.close-btn:hover { background: var(--bg); }
+.detail-date { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+.detail-cats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.detail-cat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.cat-name { color: var(--text); }
+.cat-count { font-weight: 600; color: var(--primary); }
+.detail-memo {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+.study-link {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+.study-link:hover { text-decoration: underline; }
 </style>

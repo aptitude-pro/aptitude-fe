@@ -15,19 +15,23 @@
             <label>제목 *</label>
             <input v-model="form.title" placeholder="책 제목" />
           </div>
-          <div class="form-group">
-            <label>저자</label>
-            <input v-model="form.author" placeholder="저자명" />
+          <div class="form-group form-group--narrow">
+            <label>년도</label>
+            <input v-model.number="form.year" type="number" min="2000" max="2099" placeholder="2025" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>출판사</label>
-            <input v-model="form.publisher" placeholder="출판사" />
-          </div>
-          <div class="form-group">
-            <label>ISBN</label>
-            <input v-model="form.isbn" placeholder="ISBN (선택)" />
+            <label>시험 유형</label>
+            <div class="type-toggle">
+              <button
+                v-for="t in examTypes"
+                :key="t"
+                :class="['type-btn', { active: form.examType === t }]"
+                type="button"
+                @click="form.examType = t"
+              >{{ t }}</button>
+            </div>
           </div>
         </div>
         <div class="form-actions">
@@ -45,9 +49,9 @@
           <div class="book-info">
             <span class="book-title">{{ book.title }}</span>
             <span class="book-meta">
-              <template v-if="book.author">{{ book.author }}</template>
-              <template v-if="book.author && book.publisher"> · </template>
-              <template v-if="book.publisher">{{ book.publisher }}</template>
+              <template v-if="book.year">{{ book.year }}</template>
+              <template v-if="book.year && book.examType"> · </template>
+              <template v-if="book.examType">{{ book.examType }}</template>
             </span>
           </div>
           <button
@@ -63,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useStudyStore } from '@/stores/study'
 
 const props = defineProps({
@@ -76,9 +80,8 @@ const studyStore = useStudyStore()
 const books = computed(() => studyStore.books)
 const showForm = ref(false)
 const loading = ref(false)
-const form = ref({ title: '', author: '', publisher: '', isbn: '' })
-
-import { computed } from 'vue'
+const examTypes = ['SKCT', 'GSAT', '종합']
+const form = ref({ title: '', year: new Date().getFullYear(), examType: 'SKCT' })
 
 function canDelete(book) {
   return props.myRole === 'LEADER' || book.registeredBy === props.myUserId
@@ -90,7 +93,7 @@ async function submitBook() {
   const result = await studyStore.addBook(props.studyId, form.value)
   loading.value = false
   if (result.success) {
-    form.value = { title: '', author: '', publisher: '', isbn: '' }
+    form.value = { title: '', year: new Date().getFullYear(), examType: 'SKCT' }
     showForm.value = false
   } else {
     alert(result.message || '등록에 실패했습니다.')
@@ -135,6 +138,19 @@ async function removeBook(bookId) {
   box-sizing: border-box;
 }
 .form-group input:focus { border-color: var(--primary); }
+.form-group--narrow { max-width: 120px; }
+.type-toggle { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.type-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fff;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .form-actions { display: flex; justify-content: flex-end; }
 
 .book-list { display: flex; flex-direction: column; gap: 8px; }

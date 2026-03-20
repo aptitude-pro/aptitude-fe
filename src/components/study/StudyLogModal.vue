@@ -127,15 +127,19 @@ const totalProblems = computed(() =>
 
 async function handleSave() {
   saving.value = true
-  const categoryInputs = categories.value
-    .map(c => ({ categoryName: c, problemCount: form.value.categoryMap[c] || 0 }))
-    .filter(c => c.problemCount > 0)
-  emit('saved', {
-    logDate: props.date,
-    bookId: form.value.bookId,
-    memo: form.value.memo,
-    categories: categoryInputs
-  })
+  try {
+    const categoryInputs = categories.value
+      .map(c => ({ categoryName: c, problemCount: form.value.categoryMap[c] || 0 }))
+      .filter(c => c.problemCount > 0)
+    emit('saved', {
+      logDate: props.date,
+      bookId: form.value.bookId,
+      memo: form.value.memo,
+      categories: categoryInputs
+    })
+  } finally {
+    saving.value = false
+  }
 }
 
 async function handleDelete() {
