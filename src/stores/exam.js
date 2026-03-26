@@ -44,7 +44,9 @@ export const useExamStore = defineStore('exam', () => {
       // 저장된 답안 복구
       if (session.value.answers) {
         session.value.answers.forEach(a => {
-          answers.value[a.questionNo] = a.selectedAnswer
+          if (a.selectedAnswer != null) answers.value[a.questionNo] = a.selectedAnswer
+          if (a.isGuessed) guesses.value[a.questionNo] = true
+          if (a.isWrong) wrongs.value[a.questionNo] = true
         })
       }
       if (session.value.memoData?.text) {
@@ -57,9 +59,16 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   async function saveAnswers(sessionId) {
-    const payload = Object.entries(answers.value).map(([questionNo, selectedAnswer]) => ({
-      questionNo: parseInt(questionNo),
-      selectedAnswer
+    const allNos = new Set([
+      ...Object.keys(answers.value).map(Number),
+      ...Object.keys(guesses.value).filter(k => guesses.value[k]).map(Number),
+      ...Object.keys(wrongs.value).filter(k => wrongs.value[k]).map(Number)
+    ])
+    const payload = [...allNos].map(no => ({
+      questionNo: no,
+      selectedAnswer: answers.value[no] ?? null,
+      isGuessed: !!guesses.value[no],
+      isWrong: !!wrongs.value[no]
     }))
     try {
       await apiClient.put(`/sessions/${sessionId}/answers`, { answers: payload })
