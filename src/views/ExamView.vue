@@ -253,7 +253,6 @@ const showExitDialog = ref(false)
 const showScoreModal = ref(false)
 const sessionNote = ref('')
 const submitting = ref(false)
-const saveAfterExit = ref(false)
 const panelWidths = ref(examType === 'GSAT' ? [5, 1.5, 1.5] : [5, 1.5, 1.5])
 const showToolPanel = ref(true)
 const bodyRef = ref(null)
@@ -292,7 +291,6 @@ onMounted(async () => {
   examStore.resetAll()
   if (!isLocalSession) {
     await examStore.loadSession(sessionId)
-    loadMarksLocally()
   } else {
     // 1. localStorage 저장 답안 복원 (이어하기)
     const stored = localStorage.getItem(`skct_session_data_${sessionId}`)
@@ -333,7 +331,6 @@ onMounted(async () => {
   saveTimer = setInterval(() => {
     if (!isLocalSession) {
       examStore.saveAnswers(sessionId)
-      saveMarksLocally()
     } else {
       saveLocalSessionData()
     }
@@ -462,15 +459,13 @@ async function handleSubmit(auto = false) {
 function onScoreSaved({ resultId, isDraft } = {}) {
   removeSessionFromLocalStorage()
   const trimmed = sessionNote.value.trim()
-  const afterExit = saveAfterExit.value
-  saveAfterExit.value = false
 
   if (typeof resultId === 'number') {
     if (trimmed) {
       localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
       localStorage.setItem(`result_note_${resultId}`, trimmed)
     }
-    if (afterExit || isDraft) {
+    if (isDraft) {
       router.push('/my/results')
     } else {
       router.push({ path: `/results/${resultId}`, query: { sessionId } })
@@ -485,7 +480,11 @@ function onScoreSaved({ resultId, isDraft } = {}) {
   }
 }
 
-function exitWithoutSave() {
+async function exitWithoutSave() {
+  if (!isLocalSession) {
+    await examStore.deleteSession(sessionId)
+  }
+  removeSessionFromLocalStorage()
   router.push('/exam')
 }
 
@@ -533,7 +532,6 @@ async function saveDraftToDb() {
 async function handleSave() {
   if (!isLocalSession) {
     await examStore.saveAnswers(sessionId)
-    saveMarksLocally()
   } else {
     saveLocalSessionData()
     saveSessionToLocalStorage()
@@ -544,15 +542,17 @@ async function handleSave() {
 async function exitWithSave() {
   if (!isLocalSession) {
     await examStore.saveAnswers(sessionId)
-    saveMarksLocally()
   } else {
     saveLocalSessionData()
     saveSessionToLocalStorage()
   }
   if (examType === 'SKCT') {
-    saveAfterExit.value = true
+    submitting.value = true
     showExitDialog.value = false
-    showScoreModal.value = true
+    await saveDraftToDb()
+    submitting.value = false
+    removeSessionFromLocalStorage()
+    router.push('/my/results')
   } else {
     router.push('/exam')
   }
@@ -561,13 +561,13 @@ async function exitWithSave() {
 function handleToggleGuess(n) {
   if (examStore.guesses[n]) examStore.clearGuess(n)
   else examStore.setGuess(n)
-  isLocalSession ? saveLocalSessionData() : saveMarksLocally()
+  if (isLocalSession) saveLocalSessionData()
 }
 
 function handleToggleWrong(n) {
   if (examStore.wrongs[n]) examStore.clearWrong(n)
   else examStore.setWrong(n)
-  isLocalSession ? saveLocalSessionData() : saveMarksLocally()
+  if (isLocalSession) saveLocalSessionData()
 }
 
 function handleStudyComplete() {

@@ -4,7 +4,7 @@
 
         <div class="modal-header">
           <h3>채점 결과 입력</h3>
-          <p>응시 정보와 분야별 점수를 입력하세요 (0~100)</p>
+          <p>응시 정보와 분야별 점수를 입력하세요 (0~20)</p>
         </div>
 
         <!-- 저장 방법 선택 (다시 풀기인 경우) -->
@@ -78,6 +78,13 @@
 
         <div class="divider-line" />
 
+        <button
+          v-if="hasWrongMarks"
+          class="btn-auto-calc"
+          type="button"
+          @click="autoFillScores"
+        >틀린 마킹으로 자동 계산</button>
+
         <div class="score-fields">
           <div v-for="cat in CATEGORIES" :key="cat" class="score-row">
             <label class="cat-label">{{ cat }}</label>
@@ -85,7 +92,7 @@
               <input
                 type="number"
                 min="0"
-                max="100"
+                max="20"
                 v-model.number="scores[cat]"
                 class="score-input"
                 placeholder="0"
@@ -116,6 +123,14 @@
 import { ref, computed } from 'vue'
 import { useResultStore } from '@/stores/result'
 import { useAuthStore } from '@/stores/auth'
+
+const CATEGORY_RANGES = {
+  '언어이해':  [1,  20],
+  '자료해석':  [21, 40],
+  '창의수리':  [41, 60],
+  '언어추리':  [61, 80],
+  '수열추리':  [81, 100],
+}
 
 const props = defineProps({
   visible: Boolean,
@@ -160,6 +175,20 @@ function buildQuestions() {
   }))
 }
 
+const hasWrongMarks = computed(() =>
+  Object.values(props.wrongs).some(v => v)
+)
+
+function autoFillScores() {
+  for (const [cat, [start, end]] of Object.entries(CATEGORY_RANGES)) {
+    let wrongCount = 0
+    for (let no = start; no <= end; no++) {
+      if (props.wrongs[no]) wrongCount++
+    }
+    scores.value[cat] = 20 - wrongCount
+  }
+}
+
 const totalScore = computed(() => {
   const vals = CATEGORIES.map(c => scores.value[c]).filter(v => v !== null && v !== '')
   if (vals.length === 0) return 0
@@ -178,9 +207,9 @@ async function handleSubmit() {
     errorMsg.value = '모든 분야의 점수를 입력해주세요.'
     return
   }
-  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 100)
+  const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
   if (invalid) {
-    errorMsg.value = '점수는 0~100 사이로 입력해주세요.'
+    errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
     return
   }
 
@@ -349,6 +378,21 @@ async function handleSubmit() {
   border-top: 1px solid #e5e7eb;
   margin-bottom: 16px;
 }
+
+.btn-auto-calc {
+  width: 100%;
+  padding: 9px;
+  margin-bottom: 14px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-auto-calc:hover { background: #d1fae5; }
 
 .score-fields { display: flex; flex-direction: column; gap: 12px; }
 

@@ -2,7 +2,23 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiClient from '@/api'
 
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.exp * 1000 < Date.now()
+  } catch (_) {
+    return true
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
+  // 스토어 초기화 시점에 동기적으로 만료 토큰 정리 (컴포넌트 마운트 전)
+  const _storedToken = localStorage.getItem('accessToken')
+  if (_storedToken && isTokenExpired(_storedToken)) {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('user')
+  }
+
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const accessToken = ref(localStorage.getItem('accessToken') || null)
   const showModal = ref(false)
