@@ -132,6 +132,11 @@ const pwColor = computed(() => {
 })
 
 async function afterAuth() {
+  const action = auth.consumePendingAction()
+  if (action) {
+    await action()
+    return
+  }
   const raw = sessionStorage.getItem('pendingManualResult')
   if (raw) {
     sessionStorage.removeItem('pendingManualResult')

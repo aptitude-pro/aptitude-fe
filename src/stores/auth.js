@@ -24,6 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
   const showModal = ref(false)
   const modalTab = ref('login') // 'login' | 'register'
   const pendingRedirectPath = ref(null)
+  const pendingAction = ref(null)
 
   const isLoggedIn = computed(() => !!accessToken.value)
 
@@ -34,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function closeModal() {
     showModal.value = false
+    pendingAction.value = null
   }
 
   function setAuth(userData, token) {
@@ -92,6 +94,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setPendingAction(fn) {
+    pendingAction.value = fn
+  }
+  function consumePendingAction() {
+    const fn = pendingAction.value
+    pendingAction.value = null
+    return fn
+  }
+
   function setPendingRedirect(path) {
     pendingRedirectPath.value = path
   }
@@ -112,6 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
     user, accessToken, isLoggedIn, showModal, modalTab,
     openModal, closeModal, login, register, logout, setAuth, clearAuth,
     sendEmailCode, verifyEmailCode,
-    setPendingRedirect, consumePendingRedirect
+    setPendingRedirect, consumePendingRedirect,
+    pendingAction, setPendingAction, consumePendingAction
   }
 })

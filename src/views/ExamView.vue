@@ -40,7 +40,7 @@
       </div>
 
       <!-- 드래그 핸들 1 -->
-      <div v-show="!isNarrow" class="divider" @mousedown="startDrag(0)" />
+      <div v-show="!isNarrow" class="divider" @mousedown="startDrag(0, $event)" />
 
       <!-- 중: OMR 답안지 -->
       <div class="panel panel-omr" :style="{ flex: panelWidths[1] }">
@@ -64,7 +64,7 @@
       <div
         class="divider divider-right"
         :class="{ 'is-collapsed': !showToolPanel }"
-        @mousedown="showToolPanel ? startDrag(1) : null"
+        @mousedown="showToolPanel ? startDrag(1, $event) : null"
         @click="!showToolPanel ? openToolPanel() : null"
       >
         <button class="panel-toggle-btn" @click.stop="toggleToolPanel" title="패널 열기/닫기">
@@ -290,7 +290,16 @@ const unansweredCount = computed(() => questionCount - answeredCount.value)
 onMounted(async () => {
   examStore.resetAll()
   if (!isLocalSession) {
-    await examStore.loadSession(sessionId)
+    const loaded = await examStore.loadSession(sessionId)
+    if (!loaded.success) {
+      if (authStore.showModal) {
+        authStore.setPendingAction(() => router.go(0))
+      } else {
+        alert('세션을 불러오지 못했습니다. 시험 목록으로 이동합니다.')
+        router.push('/exam')
+      }
+      return
+    }
   } else {
     // 1. localStorage 저장 답안 복원 (이어하기)
     const stored = localStorage.getItem(`skct_session_data_${sessionId}`)
@@ -443,6 +452,11 @@ async function handleSubmit(auto = false) {
       router.push({ path: `/results/${result.data.id}`, query: { sessionId } })
       return
     }
+    // 401로 인해 로그인 모달이 열린 경우 → 재로그인 후 제출 재시도
+    if (authStore.showModal) {
+      authStore.setPendingAction(() => handleSubmit())
+    }
+    return
   }
 
   // 로컬 세션 (비-SKCT): 답안 전달
@@ -577,9 +591,9 @@ function handleStudyComplete() {
 }
 
 // 패널 드래그
-function startDrag(idx) {
+function startDrag(idx, e) {
   draggingIdx = idx
-  startX = event.clientX
+  startX = e.clientX
   startWidths = [...panelWidths.value]
   document.body.style.cursor = 'col-resize'
   document.body.style.userSelect = 'none'
