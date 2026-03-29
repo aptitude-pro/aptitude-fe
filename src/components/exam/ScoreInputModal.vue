@@ -245,6 +245,9 @@ async function handleSubmit() {
 
   if (result.success) {
     emit('saved', { resultId: result.resultId, isDraft: false })
+  } else if (authStore.showModal) {
+    // 로그인 만료로 인한 모달 → 재로그인 후 자동 재제출
+    authStore.setPendingAction(() => handleSubmit())
   } else {
     errorMsg.value = '저장에 실패했습니다. 다시 시도해주세요.'
   }
