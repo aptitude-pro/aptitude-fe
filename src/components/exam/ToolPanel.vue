@@ -13,10 +13,15 @@
           <select v-model="localMinutes" class="time-select" @change="onTimeSelect">
             <option v-for="m in timeOptions" :key="m" :value="m">{{ m }}분</option>
           </select>
-          <button class="timer-help" title="도움말">?</button>
-        </div>
-        <div class="mini-timer-adjust">
-          <button class="timer-btn adjust" @click="addSeconds(15)">+15초</button>
+          <div class="add-seconds-group">
+            <select v-model="addSecondsAmount" class="add-sec-select">
+              <option :value="5">5초</option>
+              <option :value="15">15초</option>
+              <option :value="30">30초</option>
+              <option :value="60">60초</option>
+            </select>
+            <button class="timer-btn adjust-inline" @click="addSeconds(addSecondsAmount)">+추가</button>
+          </div>
         </div>
         <div class="mini-time-display" :class="{ warn: timerWarn, danger: timerDanger }">
           {{ formattedLocalTime }}
@@ -100,6 +105,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset', 'add-seconds'])
 
+const addSecondsAmount = ref(15)
 const activeTab = ref('memo')
 const drawRef = ref(null)
 
@@ -282,17 +288,33 @@ onUnmounted(() => {
   outline: none;
 }
 
-.timer-help {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+.add-seconds-group {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+}
+.add-sec-select {
+  padding: 3px 4px;
+  font-size: 11px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #e8f4fd;
+  color: #2563eb;
+  cursor: pointer;
+}
+.adjust-inline {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: #e8f4fd;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.adjust-inline:hover {
+  background: #dbeafe;
 }
 
 .mini-time-display {
@@ -322,11 +344,6 @@ onUnmounted(() => {
 .timer-btn.start { background: #10b981; color: #fff; }
 .timer-btn.stop { background: #ef4444; color: #fff; }
 .timer-btn.reset { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-.timer-btn.adjust { background: #6366f1; color: #fff; }
-
-.mini-timer-adjust {
-  margin-bottom: 6px;
-}
 
 .tool-tabs {
   display: flex;
