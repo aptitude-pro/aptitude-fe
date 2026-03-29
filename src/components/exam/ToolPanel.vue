@@ -17,10 +17,10 @@
             <select v-model="addSecondsAmount" class="add-sec-select">
               <option :value="5">5초</option>
               <option :value="15">15초</option>
-              <option :value="30">30초</option>
+              <option :value="30" style="font-weight: 700;">30초</option>
               <option :value="60">60초</option>
             </select>
-            <button class="timer-btn adjust-inline" @click="addSeconds(addSecondsAmount)">+추가</button>
+            <button class="adjust-inline" @click="addSeconds(addSecondsAmount)">+추가</button>
           </div>
         </div>
         <div class="mini-time-display" :class="{ warn: timerWarn, danger: timerDanger }">
@@ -275,7 +275,7 @@ onUnmounted(() => {
 .mini-timer-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
@@ -294,27 +294,30 @@ onUnmounted(() => {
   gap: 4px;
 }
 .add-sec-select {
-  padding: 3px 4px;
-  font-size: 11px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
-  background: #e8f4fd;
-  color: #2563eb;
+  padding: 4px 6px;
+  font-size: 13px;
+  background: #f9fafb;
+  color: #374151;
+  outline: none;
   cursor: pointer;
 }
 .adjust-inline {
   flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
   border-radius: 6px;
-  background: #e8f4fd;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s;
 }
 .adjust-inline:hover {
-  background: #dbeafe;
+  background: #e5e7eb;
 }
 
 .mini-time-display {
