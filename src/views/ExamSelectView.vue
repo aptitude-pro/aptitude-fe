@@ -90,6 +90,18 @@
       </div>
     </div>
 
+    <!-- 임시저장 한도 초과 다이얼로그 -->
+    <div v-if="showLimitDialog" class="dialog-overlay" @click.self="showLimitDialog = false">
+      <div class="dialog">
+        <h3>임시저장 한도 초과</h3>
+        <p>임시저장은 최대 3개까지 가능합니다.</p>
+        <p>아래 진행 중인 시험 목록에서 불필요한 세션을 삭제한 후 다시 시도해주세요.</p>
+        <div class="dialog-actions">
+          <button class="btn-secondary" @click="showLimitDialog = false">확인</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 시험 시작 확인 다이얼로그 -->
     <div v-if="showStartDialog" class="dialog-overlay" @click.self="showStartDialog = false">
       <div class="dialog">
@@ -120,6 +132,7 @@ const starting = ref(false)
 const savedSessions = ref([])
 const showResumeDialog = ref(false)
 const resumeCandidate = ref(null)
+const showLimitDialog = ref(false)
 
 onMounted(() => {
   try {
@@ -178,6 +191,10 @@ const tips = [
 
 function startExam(exam) {
   selectedExam.value = exam
+  if (savedSessions.value.length >= 3) {
+    showLimitDialog.value = true
+    return
+  }
   const existing = savedSessions.value.find(s => s.examType === exam.id)
   if (existing) {
     resumeCandidate.value = existing
@@ -219,12 +236,6 @@ function doResume() {
 }
 
 function doFreshStart() {
-  const sid = resumeCandidate.value.sessionId
-  localStorage.removeItem(`skct_session_data_${sid}`)
-  localStorage.removeItem(`skct_marks_${sid}`)
-  const sessions = JSON.parse(localStorage.getItem('skct_sessions') || '[]').filter(s => s.sessionId !== sid)
-  localStorage.setItem('skct_sessions', JSON.stringify(sessions))
-  savedSessions.value = sessions.filter(s => s.mode !== 'study')
   showResumeDialog.value = false
   showStartDialog.value = true
 }

@@ -7,6 +7,9 @@
           <option v-for="m in timeOptions" :key="m" :value="m">{{ m }}분</option>
         </select>
       </div>
+      <div class="timer-adjust">
+        <button class="timer-btn adjust" @click="addSeconds(15)">+15초</button>
+      </div>
       <div class="time-display" :class="{ warn: timerWarn, danger: timerDanger }">
         {{ formattedTime }}
       </div>
@@ -44,7 +47,7 @@ const props = defineProps({
   remaining: { type: Number, default: 0 },
   timerRunning: { type: Boolean, default: false }
 })
-const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset'])
+const emit = defineEmits(['update-memo', 'update-time-limit', 'timer-start', 'timer-stop', 'timer-reset', 'add-seconds'])
 
 const timeOptions = [0, 15, 30, 45, 60, 75, 90, 105, 120, 150, 180]
 const localMinutes = ref(60)
@@ -78,6 +81,10 @@ function toggleTimer() {
 
 function resetTimer() {
   emit('timer-reset')
+}
+
+function addSeconds(sec) {
+  emit('add-seconds', sec)
 }
 
 function clearMemo() {
@@ -145,6 +152,11 @@ onMounted(() => {
 .timer-btn.start { background: #10b981; color: #fff; }
 .timer-btn.stop { background: #ef4444; color: #fff; }
 .timer-btn.reset { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+.timer-btn.adjust { background: #6366f1; color: #fff; }
+
+.timer-adjust {
+  margin-bottom: 6px;
+}
 
 .memo-header {
   display: flex;

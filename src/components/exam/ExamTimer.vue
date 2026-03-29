@@ -33,13 +33,6 @@ watch(() => props.running, (val) => {
         clearInterval(interval)
         emit('expired')
       }
-      // 경고 알림
-      if (remaining.value === 300 || remaining.value === 60) {
-        const minutes = Math.floor(remaining.value / 60)
-        if (Notification.permission === 'granted') {
-          new Notification(`⏰ ${minutes}분 남았습니다!`)
-        }
-      }
     }, 1000)
   } else {
     clearInterval(interval)

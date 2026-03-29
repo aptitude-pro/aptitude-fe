@@ -88,6 +88,7 @@
           @timer-start="handleTimerStart"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
+          @add-seconds="handleAddSeconds"
         />
         <ToolPanel
           v-else
@@ -101,6 +102,7 @@
           @timer-start="handleTimerStart"
           @timer-stop="timerRunning = false"
           @timer-reset="handleTimerReset"
+          @add-seconds="handleAddSeconds"
         />
       </div>
     </div>
@@ -261,18 +263,8 @@ let startX = 0
 let startWidths = []
 let saveTimer = null
 
-// 알림 설정 읽기
-const notifSettings = (() => {
-  try {
-    const s = localStorage.getItem('notificationSettings')
-    return s ? JSON.parse(s) : { timer5min: true, timer1min: true }
-  } catch (_) { return { timer5min: true, timer1min: true } }
-})()
-
 // 타이머 경고 상태
 const timerWarning = ref('')
-let warned5min = false
-let warned1min = false
 
 const timerElapsed = computed(() => {
   if (!timerEverStarted.value || !totalSeconds.value) return null
@@ -359,17 +351,6 @@ onUnmounted(() => {
 
 function onTick(remaining) {
   remainingSeconds.value = remaining
-
-  if (notifSettings.timer5min && remaining === 300 && !warned5min) {
-    warned5min = true
-    timerWarning.value = '⚠️ 시험 종료 5분 전입니다!'
-    setTimeout(() => { timerWarning.value = '' }, 8000)
-  }
-  if (notifSettings.timer1min && remaining === 60 && !warned1min) {
-    warned1min = true
-    timerWarning.value = '🚨 시험 종료 1분 전입니다!'
-    setTimeout(() => { timerWarning.value = '' }, 8000)
-  }
 }
 
 function handleTimeLimitUpdate(minutes) {
@@ -379,12 +360,15 @@ function handleTimeLimitUpdate(minutes) {
   timerKey.value++
 }
 
+function handleAddSeconds(sec) {
+  remainingSeconds.value = remainingSeconds.value + sec
+  totalSeconds.value = totalSeconds.value + sec
+}
+
 function handleTimerReset() {
   timerRunning.value = false
   remainingSeconds.value = totalSeconds.value
   timerKey.value++
-  warned5min = false
-  warned1min = false
 }
 
 
@@ -394,6 +378,8 @@ async function onTimeExpired() {
     timerWarning.value = '⏱ 시간이 종료되었습니다. 계속 학습하거나 완료하세요.'
     setTimeout(() => { timerWarning.value = '' }, 10000)
   } else {
+    timerWarning.value = '⏰ 시간이 종료되었습니다!'
+    setTimeout(() => { timerWarning.value = '' }, 5000)
     await handleSubmit(true)
   }
 }
