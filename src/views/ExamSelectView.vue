@@ -124,8 +124,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '@/api'
+import { useResultStore } from '@/stores/result'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const resultStore = useResultStore()
+const authStore = useAuthStore()
 const showStartDialog = ref(false)
 const selectedExam = ref(null)
 const starting = ref(false)
@@ -207,15 +211,28 @@ function startExam(exam) {
 async function confirmStart() {
   starting.value = true
   try {
-    // 로그인 여부 관계없이 로컬 세션으로 시험 시작
     const sessionId = `local-${Date.now()}`
+    let draftId = null
+
+    if (authStore.isLoggedIn && selectedExam.value.id === 'SKCT') {
+      const count = await resultStore.fetchDraftCount()
+      if (count >= 2) {
+        alert('임시저장은 최대 2개까지 가능합니다.\n기존 임시저장을 삭제한 후 다시 시도해주세요.')
+        starting.value = false
+        return
+      }
+      const res = await resultStore.createDraft()
+      if (res.success) draftId = res.resultId
+    }
+
     router.push({
       name: 'ExamSession',
       params: { sessionId },
       query: {
         examType: selectedExam.value.id,
         questionCount: selectedExam.value.questionCount,
-        examName: selectedExam.value.name
+        examName: selectedExam.value.name,
+        ...(draftId ? { retryResultId: draftId } : {})
       }
     })
   } catch (err) {

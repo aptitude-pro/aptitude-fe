@@ -196,7 +196,7 @@ const totalScore = computed(() => {
 })
 
 const effectivePlatform = computed(() =>
-  selectedPlatform.value === '기타' ? (customPlatform.value || '기타') : selectedPlatform.value
+  selectedPlatform.value === '기타' ? (customPlatform.value.trim() || '기타') : selectedPlatform.value
 )
 
 async function handleSubmit() {
@@ -210,6 +210,10 @@ async function handleSubmit() {
   const invalid = CATEGORIES.find(c => scores.value[c] < 0 || scores.value[c] > 20)
   if (invalid) {
     errorMsg.value = '점수는 0~20 사이로 입력해주세요.'
+    return
+  }
+  if (selectedPlatform.value === '기타' && !customPlatform.value.trim()) {
+    errorMsg.value = '기타 플랫폼의 이름을 직접 입력해주세요.'
     return
   }
 

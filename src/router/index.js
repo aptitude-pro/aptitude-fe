@@ -65,6 +65,12 @@ const router = createRouter({
       path: '/timer',
       name: 'Timer',
       component: () => import('@/views/TimerView.vue')
+    },
+    {
+      path: '/mini-game',
+      name: 'MiniGame',
+      component: () => import('@/views/MiniGameView.vue'),
+      meta: { guestLayout: true }
     }
   ]
 })

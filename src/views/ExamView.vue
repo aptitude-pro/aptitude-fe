@@ -305,33 +305,33 @@ onMounted(async () => {
       } catch (_) {}
     }
 
-    // 2. prevAnswers query param 복원 (다시 풀기) — localStorage 복원 이후 덮어씀
-    if (route.query.prevAnswers) {
-      try {
-        const prev = JSON.parse(route.query.prevAnswers)
-        Object.entries(prev).forEach(([k, v]) => examStore.setAnswer(parseInt(k), v))
-      } catch (_) {}
-    }
-    // prevGuesses 복원
-    if (route.query.prevGuesses) {
-      try {
-        JSON.parse(route.query.prevGuesses).forEach(no => examStore.setGuess(parseInt(no)))
-      } catch (_) {}
-    }
-    // prevWrongs 복원
-    if (route.query.prevWrongs) {
-      try {
-        JSON.parse(route.query.prevWrongs).forEach(no => examStore.setWrong(parseInt(no)))
-      } catch (_) {}
+    // 2. localStorage 없고 retryResultId 있으면 → 서버에서 fetch (브라우저 바뀐 경우)
+    if (!stored && retryResultId) {
+      const res = await resultStore.fetchResult(retryResultId)
+      if (res.success && resultStore.currentResult?.answers) {
+        resultStore.currentResult.answers.forEach(a => {
+          if (a.selectedAnswer != null) examStore.setAnswer(a.questionNo, a.selectedAnswer)
+          if (a.isGuessed) examStore.setGuess(a.questionNo)
+          if (a.isWrong) examStore.setWrong(a.questionNo)
+        })
+      }
     }
 
     saveSessionToLocalStorage()
   }
 
   // 30초마다 자동저장
-  saveTimer = setInterval(() => {
+  saveTimer = setInterval(async () => {
     if (!isLocalSession) {
       examStore.saveAnswers(sessionId)
+    } else if (retryResultId) {
+      // DB 자동저장 (로그인 상태 & draft 있을 때)
+      await resultStore.saveDraftAnswers(
+        retryResultId,
+        buildDraftQuestions(),
+        timerElapsed.value
+      )
+      saveLocalSessionData() // localStorage도 캐시로 유지
     } else {
       saveLocalSessionData()
     }

@@ -13,7 +13,7 @@
         <div
           v-for="n in props.questionCount"
           :key="n"
-          :class="['omr-row', { answered: props.answers[n], unanswered: props.showUnansweredWarning && !props.answers[n], guessed: props.guesses[n], wronged: props.wrongs[n] }]"
+          :class="['omr-row', { answered: props.answers[n], unanswered: props.showUnansweredWarning && !props.answers[n], guessed: props.guesses[n], wronged: props.wrongs[n], 'group-end': n % 5 === 0 && n !== props.questionCount }]"
         >
           <span class="q-num">{{ n }}</span>
           <div class="choices">
@@ -221,6 +221,12 @@ function confirmReset() {
 .wrong-btn:hover { border-color: #fca5a5; color: #ef4444; }
 .wrong-btn.active { background: #fff1f2; color: #ef4444; border-color: #fca5a5; }
 .omr-row.wronged .q-num { color: #ef4444; }
+
+.omr-row.group-end {
+  border-bottom: 1.5px solid #e5e7eb;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
 
 @media (max-width: 1440px) {
   .choice-btn {

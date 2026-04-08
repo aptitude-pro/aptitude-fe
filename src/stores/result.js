@@ -93,6 +93,26 @@ export const useResultStore = defineStore('result', () => {
     } catch (_) {}
   }
 
+  async function createDraft() {
+    const emptyScores = Object.fromEntries(
+      ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'].map(c => [c, 0])
+    )
+    return saveManualResult(null, emptyScores, {
+      examYear: null, examPeriod: null, platform: null, examRound: null,
+      elapsedSeconds: null, questions: [], isDraft: true
+    })
+  }
+
+  async function saveDraftAnswers(draftId, questions, elapsedSeconds) {
+    const emptyScores = Object.fromEntries(
+      ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'].map(c => [c, 0])
+    )
+    return updateManualResult(draftId, emptyScores, {
+      examYear: null, examPeriod: null, platform: null, examRound: null,
+      elapsedSeconds, questions, isDraft: true
+    })
+  }
+
   async function fetchDraftCount() {
     try {
       const res = await apiClient.get('/results')
@@ -129,6 +149,7 @@ export const useResultStore = defineStore('result', () => {
   return {
     results, currentResult, growthData, categoryData, stats, activityData,
     fetchResults, fetchResult, fetchGrowthData, fetchCategoryData, fetchStats,
-    fetchActivityData, saveManualResult, updateManualResult, deleteResult, fetchDraftCount
+    fetchActivityData, saveManualResult, updateManualResult, deleteResult, fetchDraftCount,
+    createDraft, saveDraftAnswers
   }
 })

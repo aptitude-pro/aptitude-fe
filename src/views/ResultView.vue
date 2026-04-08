@@ -184,6 +184,7 @@ function saveNote() {
 }
 
 onMounted(async () => {
+  examStore.resetAll()
   const id = route.params.id
   if (id === 'local') {
     if (route.query.categoryScores) {
@@ -311,15 +312,6 @@ function retryExam() {
   const examNameVal = result.value?.examTitle || route.query.examName || examType
   const qCount = questionCount.value
 
-  let prevAnswers = {}
-  if (result.value?.answers?.length) {
-    result.value.answers.forEach(a => {
-      if (a.selectedAnswer != null) prevAnswers[a.questionNo] = a.selectedAnswer
-    })
-  } else if (route.query.answers) {
-    try { prevAnswers = JSON.parse(route.query.answers) } catch (_) {}
-  }
-
   router.push({
     name: 'ExamSession',
     params: { sessionId: newSessionId },
@@ -327,10 +319,7 @@ function retryExam() {
       examType,
       questionCount: qCount,
       examName: examNameVal,
-      prevAnswers: JSON.stringify(prevAnswers),
-      retryResultId: route.params.id,
-      prevGuesses: guessedList.value.length ? JSON.stringify(guessedList.value) : undefined,
-      prevWrongs:  wrongList.value.length  ? JSON.stringify(wrongList.value)  : undefined
+      retryResultId: route.params.id
     }
   })
 }
