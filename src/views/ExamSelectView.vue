@@ -232,7 +232,7 @@ async function confirmStart() {
         examType: selectedExam.value.id,
         questionCount: selectedExam.value.questionCount,
         examName: selectedExam.value.name,
-        ...(draftId ? { retryResultId: draftId } : {})
+        ...(draftId ? { draftId: draftId } : {})
       }
     })
   } catch (err) {

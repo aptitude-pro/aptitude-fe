@@ -88,7 +88,12 @@
     <div class="card">
       <div class="card-header">
         <h3>응시 이력</h3>
-        <span class="total-count">총 {{ filteredResults.length }}회</span>
+        <div class="header-right">
+          <span class="total-count">총 {{ filteredResults.length }}회</span>
+          <button class="csv-btn" :disabled="downloading" @click="downloadCsv">
+            {{ downloading ? '생성 중...' : 'CSV 다운로드' }}
+          </button>
+        </div>
       </div>
       <div v-if="filteredResults.length === 0" class="empty-state">
         <p>응시 이력이 없습니다</p>
@@ -163,6 +168,7 @@ import { useRouter } from 'vue-router'
 import { useResultStore } from '@/stores/result'
 import ScoreLineChart from '@/components/dashboard/ScoreLineChart.vue'
 import CategoryRadarChart from '@/components/dashboard/CategoryRadarChart.vue'
+import apiClient from '@/api/index.js'
 
 const router = useRouter()
 const resultStore = useResultStore()
@@ -173,6 +179,7 @@ const selectedPlatform = ref('')
 const chartTab = ref('total')
 const deleteTarget = ref(null)
 const deleting = ref(false)
+const downloading = ref(false)
 
 const EXAM_CATEGORIES = {
   SKCT: ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'],
@@ -318,6 +325,28 @@ async function doDelete() {
   await Promise.all([resultStore.fetchGrowthData(selectedType.value), resultStore.fetchCategoryData()])
 }
 
+async function downloadCsv() {
+  downloading.value = true
+  try {
+    const params = {}
+    if (selectedType.value) params.examType = selectedType.value
+    const res = await apiClient.get('/results/export/csv', { responseType: 'blob', params })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `성적리포트_${today}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('CSV 다운로드 실패', e)
+  } finally {
+    downloading.value = false
+  }
+}
+
 function formatDate(d) {
   if (!d) return '-'
   return new Date(d).toLocaleString('ko-KR', {
@@ -414,11 +443,32 @@ function formatDate(d) {
   outline: none;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .total-count {
   font-size: 13px;
   color: var(--text-muted);
   align-self: center;
 }
+
+.csv-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.csv-btn:hover:not(:disabled) { background: #e5e7eb; }
+.csv-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .empty-state {
   display: flex;

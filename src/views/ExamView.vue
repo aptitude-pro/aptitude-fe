@@ -189,7 +189,8 @@ const authStore = useAuthStore()
 const sessionId = route.params.sessionId
 const examName = route.query.examName || 'SKCT 시험'
 const examType = route.query.examType || ''
-const retryResultId = route.query.retryResultId || null
+const retryResultId = route.query.retryResultId || null  // 기존 결과 다시풀기
+const draftId = route.query.draftId || null              // 새 시험 임시저장용
 const questionCount = parseInt(route.query.questionCount) || 40
 const isStudyMode = computed(() => route.query.mode === 'study')
 const isLocalSession = sessionId.startsWith('local-') || sessionId.startsWith('study-')
@@ -305,9 +306,10 @@ onMounted(async () => {
       } catch (_) {}
     }
 
-    // 2. localStorage 없고 retryResultId 있으면 → 서버에서 fetch (브라우저 바뀐 경우)
-    if (!stored && retryResultId) {
-      const res = await resultStore.fetchResult(retryResultId)
+    // 2. localStorage 없고 draftId 또는 retryResultId 있으면 → 서버에서 fetch (브라우저 바뀐 경우)
+    const resumeId = draftId || retryResultId
+    if (!stored && resumeId) {
+      const res = await resultStore.fetchResult(resumeId)
       if (res.success && resultStore.currentResult?.answers) {
         resultStore.currentResult.answers.forEach(a => {
           if (a.selectedAnswer != null) examStore.setAnswer(a.questionNo, a.selectedAnswer)
@@ -324,10 +326,10 @@ onMounted(async () => {
   saveTimer = setInterval(async () => {
     if (!isLocalSession) {
       examStore.saveAnswers(sessionId)
-    } else if (retryResultId) {
-      // DB 자동저장 (로그인 상태 & draft 있을 때)
+    } else if (draftId) {
+      // DB 자동저장 (로그인 상태 & 새 시험 draft 있을 때)
       await resultStore.saveDraftAnswers(
-        retryResultId,
+        draftId,
         buildDraftQuestions(),
         timerElapsed.value
       )
