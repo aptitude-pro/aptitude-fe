@@ -419,6 +419,11 @@ async function handleSubmit(auto = false) {
   showSubmitDialog.value = false
   timerRunning.value = false
 
+  if (!isLocalSession) {
+    await examStore.saveAnswers(sessionId)
+    saveMarksLocally()
+  }
+
   // SKCT는 로컬/서버 무관하게 항상 수동 채점 모달
   if (examType === 'SKCT') {
     showScoreModal.value = true
@@ -431,8 +436,12 @@ async function handleSubmit(auto = false) {
     const result = await examStore.submitExam(sessionId)
     submitting.value = false
     if (result.success) {
-      removeSessionFromLocalStorage()
       const trimmed = sessionNote.value.trim()
+      localStorage.setItem(`result_marks_${result.data.id}`, JSON.stringify({
+        guesses: { ...examStore.guesses },
+        wrongs: { ...examStore.wrongs }
+      }))
+      removeSessionFromLocalStorage()
       if (trimmed) {
         localStorage.setItem(`result_note_session_${sessionId}`, trimmed)
         localStorage.setItem(`result_note_${result.data.id}`, trimmed)
@@ -563,13 +572,23 @@ async function exitWithSave() {
 function handleToggleGuess(n) {
   if (examStore.guesses[n]) examStore.clearGuess(n)
   else examStore.setGuess(n)
-  if (isLocalSession) saveLocalSessionData()
+  if (!isLocalSession) {
+    examStore.saveAnswers(sessionId)
+    saveMarksLocally()
+  } else {
+    saveLocalSessionData()
+  }
 }
 
 function handleToggleWrong(n) {
   if (examStore.wrongs[n]) examStore.clearWrong(n)
   else examStore.setWrong(n)
-  if (isLocalSession) saveLocalSessionData()
+  if (!isLocalSession) {
+    examStore.saveAnswers(sessionId)
+    saveMarksLocally()
+  } else {
+    saveLocalSessionData()
+  }
 }
 
 function handleStudyComplete() {

@@ -183,7 +183,24 @@ function saveNote() {
   isEditingNote.value = false
 }
 
+function hasMarks(marks) {
+  return Object.keys(marks.guesses || {}).length > 0 ||
+    Object.keys(marks.wrongs || {}).length > 0
+}
+
+function readJsonStorage(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null')
+  } catch (_) {
+    return null
+  }
+}
+
 onMounted(async () => {
+  const pendingMarks = {
+    guesses: { ...examStore.guesses },
+    wrongs: { ...examStore.wrongs }
+  }
   examStore.resetAll()
   const id = route.params.id
   if (id === 'local') {
@@ -221,20 +238,17 @@ onMounted(async () => {
   loading.value = false
   loadNote(id)
 
-  const storeHasMarks =
-    Object.keys(examStore.guesses).length > 0 ||
-    Object.keys(examStore.wrongs).length > 0
+  const sessionMarks = route.query.sessionId
+    ? readJsonStorage(`skct_marks_${route.query.sessionId}`)
+    : null
+  const storedResultMarks = readJsonStorage(`result_marks_${id}`)
+  const marks = hasMarks(pendingMarks)
+    ? pendingMarks
+    : (hasMarks(sessionMarks || {}) ? sessionMarks : storedResultMarks)
 
-  if (storeHasMarks) {
-    const marks = {
-      guesses: { ...examStore.guesses },
-      wrongs: { ...examStore.wrongs }
-    }
+  if (hasMarks(marks || {})) {
     localStorage.setItem(`result_marks_${id}`, JSON.stringify(marks))
     savedMarks.value = marks
-  } else {
-    const stored = localStorage.getItem(`result_marks_${id}`)
-    if (stored) savedMarks.value = JSON.parse(stored)
   }
 })
 
