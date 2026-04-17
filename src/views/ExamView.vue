@@ -189,7 +189,13 @@ const authStore = useAuthStore()
 const sessionId = route.params.sessionId
 const examName = route.query.examName || 'SKCT 시험'
 const examType = route.query.examType || ''
-const retryResultId = route.query.retryResultId || null  // 기존 결과 다시풀기
+function normalizeResultId(id) {
+  if (id == null) return null
+  const n = Number(id)
+  return Number.isInteger(n) && n > 0 ? String(n) : null
+}
+
+const retryResultId = normalizeResultId(route.query.retryResultId)  // 기존 결과 다시풀기
 const draftId = route.query.draftId || null              // 새 시험 임시저장용
 const questionCount = parseInt(route.query.questionCount) || 40
 const isStudyMode = computed(() => route.query.mode === 'study')

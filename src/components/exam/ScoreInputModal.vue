@@ -8,7 +8,7 @@
         </div>
 
         <!-- 저장 방법 선택 (다시 풀기인 경우) -->
-        <div v-if="retryResultId" class="save-method-section">
+        <div v-if="hasOverwriteTarget" class="save-method-section">
           <label class="meta-label">저장 방법</label>
           <div class="save-method-options">
             <label :class="['method-btn', { active: saveMethod === 'overwrite' }]">
@@ -161,6 +161,11 @@ const saveMethod = ref('overwrite') // 'overwrite' | 'new'
 const submitting = ref(false)
 const errorMsg = ref('')
 
+const hasOverwriteTarget = computed(() => {
+  const n = Number(props.retryResultId)
+  return Number.isInteger(n) && n > 0
+})
+
 function buildQuestions() {
   const allNos = new Set([
     ...Object.keys(props.answers).map(Number),
@@ -241,7 +246,7 @@ async function handleSubmit() {
     isDraft: false
   }
   submitting.value = true
-  const shouldOverwrite = props.retryResultId && saveMethod.value === 'overwrite'
+  const shouldOverwrite = hasOverwriteTarget.value && saveMethod.value === 'overwrite'
   const result = shouldOverwrite
     ? await resultStore.updateManualResult(props.retryResultId, { ...scores.value }, meta)
     : await resultStore.saveManualResult(props.sessionId, { ...scores.value }, meta)

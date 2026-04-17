@@ -325,6 +325,10 @@ function retryExam() {
   const examType = result.value?.examType || route.query.examType || 'SKCT'
   const examNameVal = result.value?.examTitle || route.query.examName || examType
   const qCount = questionCount.value
+  const retryId = Number(route.params.id)
+  const retryQuery = Number.isInteger(retryId) && retryId > 0
+    ? { retryResultId: String(retryId) }
+    : {}
 
   router.push({
     name: 'ExamSession',
@@ -333,7 +337,7 @@ function retryExam() {
       examType,
       questionCount: qCount,
       examName: examNameVal,
-      retryResultId: route.params.id
+      ...retryQuery
     }
   })
 }
